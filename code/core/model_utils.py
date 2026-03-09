@@ -42,7 +42,10 @@ def load_model_and_vectoriser():
         tf_path = os.path.join(root, folder, "tfidf.joblib")
         mdl_path = os.path.join(root, folder, "logreg_model.joblib")
         if os.path.exists(tf_path) and os.path.exists(mdl_path):
-            return joblib.load(tf_path), joblib.load(mdl_path)
+            try:
+                return joblib.load(tf_path), joblib.load(mdl_path)
+            except Exception:
+                pass
     return None, None
 
 
