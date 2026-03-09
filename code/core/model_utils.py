@@ -73,12 +73,17 @@ def get_top_words(tfidf, model, top_n: int = 15) -> tuple:
     """
     Get top bullying and non-bullying indicative words from LogisticRegression.
     Returns (bullying_words, non_bullying_words) as lists of (word, coef).
+    Guards against vocab/coef length mismatch (e.g. from sklearn version differences).
     """
     if tfidf is None or model is None or not hasattr(model, "coef_"):
         return [], []
-    vocab = tfidf.get_feature_names_out()
-    coef = model.coef_[0]
+    vocab = np.asarray(tfidf.get_feature_names_out())
+    coef = np.asarray(model.coef_[0])
+    n = min(len(vocab), len(coef))
+    if n == 0:
+        return [], []
+    vocab, coef = vocab[:n], coef[:n]
     idx_sorted = np.argsort(coef)
-    non_bullying = [(vocab[i], float(coef[i])) for i in idx_sorted[:top_n]]
-    bullying = [(vocab[i], float(coef[i])) for i in idx_sorted[-top_n:][::-1]]
+    non_bullying = [(str(vocab[i]), float(coef[i])) for i in idx_sorted[:top_n]]
+    bullying = [(str(vocab[i]), float(coef[i])) for i in idx_sorted[-top_n:][::-1]]
     return bullying, non_bullying
