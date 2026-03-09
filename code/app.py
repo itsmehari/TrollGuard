@@ -121,7 +121,7 @@ with tab1:
             st.session_state.pred_flagged += int(sum(preds))
             paste_df = pd.DataFrame({"Text": lines, "Prediction": ["Non-bullying" if p == 0 else "Bullying" for p in preds]})
             with st.expander("View results", expanded=True):
-                st.dataframe(paste_df, width="stretch")
+                st.dataframe(paste_df, use_container_width=True)
             flagged = sum(1 for p in preds if p == 1)
             st.caption(f"Total: {len(lines)} lines · Flagged as bullying: {flagged}")
     elif paste_input.strip() and not (tfidf and model):
@@ -159,7 +159,7 @@ with tab1:
                     up["predicted_label"] = preds
                     up["prediction"] = up["predicted_label"].map({0: "Non-bullying", 1: "Bullying"})
                     with st.expander("View results", expanded=True):
-                        st.dataframe(up, width="stretch")
+                        st.dataframe(up, use_container_width=True)
                     st.download_button("Download results (CSV)", up.to_csv(index=False).encode("utf-8"),
                                        "trollguard_predictions.csv", "text/csv")
         except Exception as e:
@@ -180,42 +180,55 @@ with tab2:
             chat_df = parse_chat_from_string(content, format_hint)
     else:
         pasted = st.text_area("Paste your chat export below", placeholder="09/03/2025, 14:30 - Alice: Hello...\n09/03/2025, 14:31 - Bob: Hi there", max_chars=MAX_INPUT_CHARS, key="chat_paste")
-        if pasted.strip():
-            chat_df = parse_chat_from_string(pasted[:MAX_INPUT_CHARS], format_hint)
+        if st.button("Analyze chat", key="chat_analyze_btn") and pasted.strip():
+            try:
+                chat_df = parse_chat_from_string(pasted[:MAX_INPUT_CHARS], format_hint)
+                st.session_state["chat_analysis_result"] = chat_df
+            except Exception as e:
+                st.error(f"Error parsing chat: {e}")
+        if "chat_analysis_result" in st.session_state and mode == "Paste chat text":
+            chat_df = st.session_state["chat_analysis_result"]
 
     if chat_df.empty:
-        st.info("Upload a .txt file or paste chat text above to analyze.")
+        if mode == "Upload file":
+            st.info("Upload a .txt file above to analyze.")
+        else:
+            st.info("Paste your chat export above and click **Analyze chat**.")
     elif not (tfidf and model):
         st.warning("Model not loaded. Go to **Train model** tab first.")
     else:
-        chat_df = chat_df.copy()
-        if not chat_df.empty:
-            date_col = pd.to_datetime(chat_df["timestamp"], errors="coerce")
-            valid_dates = date_col.dropna()
-            if not valid_dates.empty:
-                col1, col2 = st.columns(2)
-                with col1:
-                    start_d = st.date_input("From date", value=valid_dates.min().date(), key="chat_start")
-                with col2:
-                    end_d = st.date_input("To date", value=valid_dates.max().date(), key="chat_end")
-                if start_d and end_d:
-                    mask = (date_col.dt.date >= start_d) & (date_col.dt.date <= end_d)
-                    chat_df = chat_df.loc[mask]
-        chat_df["clean_text"] = chat_df["message_text"].apply(clean_text)
-        preds = predict_batch(chat_df["clean_text"].tolist(), tfidf, model)
-        chat_df["bullying_label"] = preds
-        chat_df["result"] = chat_df["bullying_label"].map({0: "Safe", 1: "Flagged"})
-        st.session_state.pred_total += len(preds)
-        st.session_state.pred_flagged += int(sum(preds))
-        with st.expander("Message-level results", expanded=True):
-            st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]], width="stretch")
-        summary = chat_df.groupby("sender")["bullying_label"].agg(["count", "sum"]).reset_index()
-        summary.columns = ["Sender", "Total messages", "Flagged"]
-        summary["Flagged %"] = (summary["Flagged"] / summary["Total messages"] * 100).round(1)
-        st.subheader("Per-sender summary")
-        st.dataframe(summary, width="stretch")
-        export_df = chat_df[["timestamp", "sender", "message_text", "result"]]
-        st.download_button("Export chat analysis (CSV)", export_df.to_csv(index=False).encode("utf-8"), "trollguard_chat_analysis.csv", "text/csv", key="chat_export")
+        try:
+            chat_df = chat_df.copy()
+            if not chat_df.empty:
+                date_col = pd.to_datetime(chat_df["timestamp"], errors="coerce")
+                valid_dates = date_col.dropna()
+                if not valid_dates.empty:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        start_d = st.date_input("From date", value=valid_dates.min().date(), key="chat_start")
+                    with col2:
+                        end_d = st.date_input("To date", value=valid_dates.max().date(), key="chat_end")
+                    if start_d is not None and end_d is not None:
+                        mask = (date_col.dt.date >= start_d) & (date_col.dt.date <= end_d)
+                        chat_df = chat_df.loc[mask]
+            chat_df["clean_text"] = chat_df["message_text"].apply(clean_text)
+            preds = predict_batch(chat_df["clean_text"].tolist(), tfidf, model)
+            chat_df["bullying_label"] = preds
+            chat_df["result"] = chat_df["bullying_label"].map({0: "Safe", 1: "Flagged"})
+            st.session_state.pred_total += len(preds)
+            st.session_state.pred_flagged += int(sum(preds))
+            with st.expander("Message-level results", expanded=True):
+                st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]], use_container_width=True)
+            summary = chat_df.groupby("sender")["bullying_label"].agg(["count", "sum"]).reset_index()
+            summary.columns = ["Sender", "Total messages", "Flagged"]
+            total = summary["Total messages"]
+            summary["Flagged %"] = (summary["Flagged"] / total.clip(lower=1) * 100).round(1)
+            st.subheader("Per-sender summary")
+            st.dataframe(summary, use_container_width=True)
+            export_df = chat_df[["timestamp", "sender", "message_text", "result"]]
+            st.download_button("Export chat analysis (CSV)", export_df.to_csv(index=False).encode("utf-8"), "trollguard_chat_analysis.csv", "text/csv", key="chat_export")
+        except Exception as e:
+            st.error(f"Error during analysis: {str(e)}")
 
 # Tab 3: Train
 with tab3:
@@ -228,7 +241,7 @@ with tab3:
         st.metric("Total samples", len(df))
         st.metric("Bullying (1)", int((df["label"] == 1).sum()))
         st.metric("Non-bullying (0)", int((df["label"] == 0).sum()))
-        st.dataframe(df["label"].value_counts().rename("count"), width="stretch")
+        st.dataframe(df["label"].value_counts().rename("count"), use_container_width=True)
     df["clean_text"] = df["text"].apply(clean_text)
     X = df["clean_text"].values
     y = df["label"].values
@@ -250,7 +263,7 @@ with tab3:
             st.text(report_str)
             st.write("Confusion matrix:")
             cm_df = pd.DataFrame(cm, index=["Actual 0", "Actual 1"], columns=["Pred 0", "Pred 1"])
-            st.dataframe(cm_df, width="stretch")
+            st.dataframe(cm_df, use_container_width=True)
             col_a, col_b = st.columns(2)
             with col_a:
                 st.download_button("Download report", report_str.encode("utf-8"), "classification_report.txt", "text/plain", key="dl_report")
