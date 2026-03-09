@@ -28,20 +28,21 @@ def clean_text(text: str) -> str:
 
 
 def get_artefact_dir() -> str:
-    """Return path to saved model/vectoriser artefacts."""
+    """Return path for saving model (models/ – committed for Streamlit Cloud)."""
     root = get_project_root()
-    out = os.path.join(root, "outputs")
-    os.makedirs(out, exist_ok=True)
-    return out
+    path = os.path.join(root, "models")
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def load_model_and_vectoriser():
-    """Load tfidf.joblib and logreg_model.joblib. Returns (tfidf, model) or (None, None)."""
-    ad = get_artefact_dir()
-    tf_path = os.path.join(ad, "tfidf.joblib")
-    mdl_path = os.path.join(ad, "logreg_model.joblib")
-    if os.path.exists(tf_path) and os.path.exists(mdl_path):
-        return joblib.load(tf_path), joblib.load(mdl_path)
+    """Load tfidf.joblib and logreg_model.joblib. Checks models/ then outputs/."""
+    root = get_project_root()
+    for folder in ("models", "outputs"):
+        tf_path = os.path.join(root, folder, "tfidf.joblib")
+        mdl_path = os.path.join(root, folder, "logreg_model.joblib")
+        if os.path.exists(tf_path) and os.path.exists(mdl_path):
+            return joblib.load(tf_path), joblib.load(mdl_path)
     return None, None
 
 

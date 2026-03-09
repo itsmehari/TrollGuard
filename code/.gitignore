@@ -22,9 +22,10 @@ build/
 *.swp
 *.swo
 
-# Project outputs (model artefacts - uncomment to track for Streamlit Cloud)
+# Project outputs (local training)
 outputs/
-!core/
+
+# models/ is tracked – pre-trained model for Streamlit Cloud
 
 # Data (large files - uncomment if needed)
 # dataset/*.csv
