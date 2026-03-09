@@ -7,10 +7,11 @@ Run: streamlit run app.py
 import os
 import sys
 
-# Ensure project root is on path
+# Ensure project root is on path and cwd (for Streamlit Cloud)
 ROOT = os.path.dirname(os.path.abspath(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 
 import streamlit as st
 import pandas as pd
