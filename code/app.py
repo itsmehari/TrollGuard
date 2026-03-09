@@ -121,7 +121,7 @@ with tab1:
             st.session_state.pred_flagged += int(sum(preds))
             paste_df = pd.DataFrame({"Text": lines, "Prediction": ["Non-bullying" if p == 0 else "Bullying" for p in preds]})
             with st.expander("View results", expanded=True):
-                st.dataframe(paste_df, use_container_width=True)
+                st.dataframe(paste_df, width="stretch")
             flagged = sum(1 for p in preds if p == 1)
             st.caption(f"Total: {len(lines)} lines · Flagged as bullying: {flagged}")
     elif paste_input.strip() and not (tfidf and model):
@@ -159,7 +159,7 @@ with tab1:
                     up["predicted_label"] = preds
                     up["prediction"] = up["predicted_label"].map({0: "Non-bullying", 1: "Bullying"})
                     with st.expander("View results", expanded=True):
-                        st.dataframe(up, use_container_width=True)
+                        st.dataframe(up, width="stretch")
                     st.download_button("Download results (CSV)", up.to_csv(index=False).encode("utf-8"),
                                        "trollguard_predictions.csv", "text/csv")
         except Exception as e:
@@ -208,12 +208,12 @@ with tab2:
         st.session_state.pred_total += len(preds)
         st.session_state.pred_flagged += int(sum(preds))
         with st.expander("Message-level results", expanded=True):
-            st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]], use_container_width=True)
+            st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]], width="stretch")
         summary = chat_df.groupby("sender")["bullying_label"].agg(["count", "sum"]).reset_index()
         summary.columns = ["Sender", "Total messages", "Flagged"]
         summary["Flagged %"] = (summary["Flagged"] / summary["Total messages"] * 100).round(1)
         st.subheader("Per-sender summary")
-        st.dataframe(summary, use_container_width=True)
+        st.dataframe(summary, width="stretch")
         export_df = chat_df[["timestamp", "sender", "message_text", "result"]]
         st.download_button("Export chat analysis (CSV)", export_df.to_csv(index=False).encode("utf-8"), "trollguard_chat_analysis.csv", "text/csv", key="chat_export")
 
@@ -228,7 +228,7 @@ with tab3:
         st.metric("Total samples", len(df))
         st.metric("Bullying (1)", int((df["label"] == 1).sum()))
         st.metric("Non-bullying (0)", int((df["label"] == 0).sum()))
-        st.dataframe(df["label"].value_counts().rename("count"), use_container_width=True)
+        st.dataframe(df["label"].value_counts().rename("count"), width="stretch")
     df["clean_text"] = df["text"].apply(clean_text)
     X = df["clean_text"].values
     y = df["label"].values
@@ -250,7 +250,7 @@ with tab3:
             st.text(report_str)
             st.write("Confusion matrix:")
             cm_df = pd.DataFrame(cm, index=["Actual 0", "Actual 1"], columns=["Pred 0", "Pred 1"])
-            st.dataframe(cm_df, use_container_width=True)
+            st.dataframe(cm_df, width="stretch")
             col_a, col_b = st.columns(2)
             with col_a:
                 st.download_button("Download report", report_str.encode("utf-8"), "classification_report.txt", "text/plain", key="dl_report")
