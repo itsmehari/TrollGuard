@@ -1,0 +1,1 @@
+# TrollGuard core utilities

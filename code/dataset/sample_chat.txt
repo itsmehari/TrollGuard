@@ -1,0 +1,129 @@
+01/08/2025, 09:00 - Asha: Hey everyone, did you all see the project announcement?
+01/08/2025, 09:01 - Meera: Yes, we have to submit the prototype next week.
+01/08/2025, 09:02 - Ravi: Morning all, we should create a plan today.
+01/08/2025, 09:03 - Karan: I can help with the frontend demo.
+01/08/2025, 09:04 - Rohan: I am still reading the instructions, little confused.
+01/08/2025, 09:05 - Asha: Still confused, Rohan? You always slow us down.
+01/08/2025, 09:06 - Meera: We can walk through it together, no problem.
+01/08/2025, 09:07 - Ravi: Let us divide work first, then clear doubts.
+01/08/2025, 09:08 - Rohan: Ok, I will take the data cleaning part if that is fine.
+01/08/2025, 09:09 - Asha: Hope you do not break the dataset again like last time.
+01/08/2025, 09:10 - Meera: That is a bit harsh.
+01/08/2025, 09:11 - Karan: We can keep a backup of the CSV, no worries.
+01/08/2025, 09:12 - Ravi: I will manage the model training and metrics.
+01/08/2025, 09:13 - Asha: I will lead the presentation slides then.
+01/08/2025, 09:14 - Rohan: Thanks, I will share progress every evening.
+01/08/2025, 09:15 - Meera: Great, let us sync at 7 pm today.
+01/08/2025, 09:16 - Asha: Rohan, do not vanish like a coward this time.
+01/08/2025, 09:17 - Rohan: I did not vanish earlier, my internet was down.
+01/08/2025, 09:18 - Asha: Always some excuse with you.
+01/08/2025, 09:19 - Meera: Guys, focus on tasks please.
+01/08/2025, 09:25 - Ravi: I will create a shared folder for all project files.
+01/08/2025, 09:26 - Karan: Share the link here once done.
+01/08/2025, 09:27 - Ravi: Folder link posted in mail also.
+01/08/2025, 09:30 - Meera: Ok, talk later, I have a class now.
+01/08/2025, 09:31 - Asha: Same here, bye for now.
+
+01/08/2025, 18:55 - Meera: Can we start the evening sync call in 5 minutes?
+01/08/2025, 18:56 - Ravi: Joining in a bit, opening Colab.
+01/08/2025, 18:57 - Karan: I am here.
+01/08/2025, 18:58 - Asha: I am also ready.
+01/08/2025, 18:59 - Meera: Waiting for Rohan.
+01/08/2025, 19:03 - Asha: Look, he is late as usual.
+01/08/2025, 19:04 - Rohan: Sorry, I just reached home.
+01/08/2025, 19:05 - Asha: You are never on time, you act like the project is a joke.
+01/08/2025, 19:06 - Meera: Let us just start, we only have one hour.
+01/08/2025, 19:07 - Ravi: Rohan, did you load the aggression dataset successfully?
+01/08/2025, 19:08 - Rohan: Yes, but some rows had missing labels, I removed them.
+01/08/2025, 19:09 - Asha: Did you even think before deleting? Sometimes you look totally clueless.
+01/08/2025, 19:10 - Rohan: I followed the instructions in the doc.
+01/08/2025, 19:11 - Karan: Maybe share a screenshot of the head of the dataframe?
+01/08/2025, 19:12 - Rohan: Sure, posting now.
+01/08/2025, 19:13 - Meera: Looks fine to me, columns are correct.
+01/08/2025, 19:14 - Ravi: Good, I will merge it with the other datasets later.
+01/08/2025, 19:15 - Asha: I still feel we are slow because of Rohan.
+01/08/2025, 19:16 - Meera: That is not fair, everyone is still learning.
+01/08/2025, 19:17 - Rohan: I am trying my best, please do not talk like that.
+01/08/2025, 19:18 - Asha: Your best is still pathetic. Stop dragging the team down.
+01/08/2025, 19:19 - Ravi: Let us calm down, we can discuss issues one by one.
+01/08/2025, 19:20 - Meera: Agreed, no point in personal attacks.
+
+01/08/2025, 21:00 - Rohan: I finished cleaning twitter_parsed_dataset and uploaded it.
+01/08/2025, 21:01 - Karan: Nice, I will use it for some visualization.
+01/08/2025, 21:02 - Asha: Someone check it carefully, his work is usually a mess.
+01/08/2025, 21:03 - Meera: I checked randomly, it is fine.
+01/08/2025, 21:04 - Rohan: Why do you always assume I will fail, Asha?
+01/08/2025, 21:05 - Asha: Because you fail most of the time. You act like you do not care.
+01/08/2025, 21:06 - Rohan: That is not true.
+01/08/2025, 21:07 - Meera: Past mistakes do not mean he will fail now.
+01/08/2025, 21:08 - Ravi: We have enough data now, let us move to model building.
+01/08/2025, 21:09 - Asha: Fine, but if something breaks, I am blaming him.
+
+02/08/2025, 08:30 - Meera: Morning all, can we focus today on model training.
+02/08/2025, 08:31 - Ravi: Yes, I will start with a simple logistic regression.
+02/08/2025, 08:32 - Karan: I will prepare plots for class distribution and length.
+02/08/2025, 08:33 - Rohan: I can help with train test split.
+02/08/2025, 08:34 - Asha: Just do not touch anything important. You break whatever you touch.
+02/08/2025, 08:35 - Rohan: That is very mean.
+02/08/2025, 08:36 - Asha: Then stop being such a burden. We are not here to babysit you.
+02/08/2025, 08:37 - Meera: This is not ok, you are clearly targeting him.
+02/08/2025, 08:38 - Ravi: We all make mistakes, let us keep the chat respectful.
+02/08/2025, 08:39 - Asha: I am just being honest. He is slow and careless.
+02/08/2025, 08:40 - Karan: Criticise work, not the person.
+02/08/2025, 08:41 - Meera: Exactly, call out issues but do not insult.
+02/08/2025, 08:42 - Rohan: I feel sick reading these messages.
+02/08/2025, 08:43 - Asha: If you cannot handle feedback, maybe you are not fit for this course.
+02/08/2025, 08:44 - Meera: That is not feedback, that is bullying.
+02/08/2025, 08:45 - Ravi: Let us pause this conversation. We will talk this through calmly later.
+
+02/08/2025, 11:00 - Rohan: I have updated the preprocessing notebook.
+02/08/2025, 11:01 - Karan: Thanks, I see the changes.
+02/08/2025, 11:02 - Asha: Did you test anything, or did you just push your usual half-baked code?
+02/08/2025, 11:03 - Rohan: I ran all cells and checked shape of data.
+02/08/2025, 11:04 - Asha: Your checking means nothing. You never notice obvious errors.
+02/08/2025, 11:05 - Meera: That is enough, Asha.
+02/08/2025, 11:06 - Asha: What, I am not allowed to say he is careless when he is?
+02/08/2025, 11:07 - Meera: Say it kindly or privately, not like this in front of everyone.
+02/08/2025, 11:08 - Rohan: I feel like quitting this project.
+02/08/2025, 11:09 - Asha: Go ahead, you will be doing us a favour.
+02/08/2025, 11:10 - Ravi: That is crossing the line.
+02/08/2025, 11:11 - Karan: Yes, that is not acceptable at all.
+02/08/2025, 11:12 - Asha: Everyone thinks it, I am just the one saying it.
+02/08/2025, 11:13 - Meera: No, we do not all think that.
+
+02/08/2025, 12:00 - Rohan: I am taking a short break, will be back in one hour.
+02/08/2025, 12:01 - Asha: Running away again. You never stay when real work starts.
+02/08/2025, 12:02 - Meera: He is just taking a break like any of us.
+02/08/2025, 12:03 - Ravi: I will try a different ngram range in TF-IDF.
+02/08/2025, 12:04 - Karan: I am adjusting labels for some edge cases.
+02/08/2025, 12:05 - Asha: I am rewriting some slide content.
+02/08/2025, 12:06 - Meera: Please also add one slide on ethical concerns.
+02/08/2025, 12:07 - Asha: Fine, I will write about ethics while we bully our teammate, nice irony.
+
+02/08/2025, 16:00 - Meera: Guys, faculty has joined the WhatsApp group for review.
+02/08/2025, 16:01 - Faculty: Hello team, I am just here to observe progress.
+02/08/2025, 16:02 - Ravi: Welcome sir, we are training the first model today.
+02/08/2025, 16:03 - Meera: I will mail the report draft by tonight.
+02/08/2025, 16:04 - Asha: We are on track, just need to polish some parts.
+02/08/2025, 16:05 - Rohan: I am fixing a bug in one of the preprocessing steps.
+02/08/2025, 16:06 - Faculty: Good, also remember to document the challenges you face.
+02/08/2025, 16:07 - Karan: We will include a section on limitations.
+02/08/2025, 16:08 - Meera: Thank you for the reminder sir.
+
+02/08/2025, 18:30 - Faculty: I also read some of the earlier conversation.
+02/08/2025, 18:31 - Faculty: I saw repeated negative comments aimed at one member.
+02/08/2025, 18:32 - Faculty: That behaviour is not acceptable in a project group.
+02/08/2025, 18:33 - Asha: Understood sir.
+02/08/2025, 18:34 - Faculty: Criticise work, not people. Do not call anyone a burden or useless.
+02/08/2025, 18:35 - Rohan: Thank you for saying that.
+02/08/2025, 18:36 - Meera: We will keep the communication healthier.
+02/08/2025, 18:37 - Ravi: Yes, we will focus on collaboration.
+02/08/2025, 18:38 - Karan: Agreed, we went too far.
+02/08/2025, 18:39 - Asha: I am sorry, Rohan. I was very rude and unfair.
+02/08/2025, 18:40 - Rohan: I appreciate the apology. I just wanted to be treated with basic respect.
+02/08/2025, 18:41 - Meera: Let us reset and finish the work together.
+02/08/2025, 18:42 - Ravi: Ok team, final push tomorrow and we are done.
+02/08/2025, 18:43 - Karan: Yes, let us make the demo strong.
+02/08/2025, 18:44 - Rohan: I will run the training again and share the final metrics.
+02/08/2025, 18:45 - Asha: I will update the PPT with new graphs and explanation.
+02/08/2025, 18:46 - Meera: Good, talk tomorrow morning.
