@@ -67,3 +67,18 @@ def predict_batch(texts: list, tfidf, model) -> np.ndarray:
     cleaned = [clean_text(t) for t in texts]
     X = tfidf.transform(cleaned)
     return model.predict(X)
+
+
+def get_top_words(tfidf, model, top_n: int = 15) -> tuple:
+    """
+    Get top bullying and non-bullying indicative words from LogisticRegression.
+    Returns (bullying_words, non_bullying_words) as lists of (word, coef).
+    """
+    if tfidf is None or model is None or not hasattr(model, "coef_"):
+        return [], []
+    vocab = tfidf.get_feature_names_out()
+    coef = model.coef_[0]
+    idx_sorted = np.argsort(coef)
+    non_bullying = [(vocab[i], float(coef[i])) for i in idx_sorted[:top_n]]
+    bullying = [(vocab[i], float(coef[i])) for i in idx_sorted[-top_n:][::-1]]
+    return bullying, non_bullying
