@@ -25,7 +25,8 @@ build/
 # Project outputs (local training)
 outputs/
 
-# models/ is tracked – pre-trained model for Streamlit Cloud
+# Pre-trained model – not committed to avoid TF-IDF/model mismatch on Streamlit Cloud (train in-app instead)
+models/*.joblib
 
 # Data (large files - uncomment if needed)
 # dataset/*.csv

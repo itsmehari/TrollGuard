@@ -111,11 +111,13 @@ def load_model_and_vectoriser():
                     model = joblib.load(mdl_path)
                 # CRITICAL: Ensure TF-IDF and model were trained together (same vocabulary size).
                 # Mismatch causes "X has N features, but LogisticRegression expects M" on predict.
-                X_dummy = tfidf.transform(["test"])
-                n_features = X_dummy.shape[1]
-                n_expected = getattr(model, "n_features_in_", None)
-                if n_expected is not None and n_features != n_expected:
-                    # Mismatched pair - reject and force retrain
+                try:
+                    X_dummy = tfidf.transform(["test"])
+                    n_features = X_dummy.shape[1]
+                    n_expected = getattr(model, "n_features_in_", None)
+                    if n_expected is not None and n_features != n_expected:
+                        return None, None
+                except Exception:
                     return None, None
                 return tfidf, model
             except Exception:
