@@ -246,7 +246,7 @@ with tab1:
                 "Prediction": ["Non-bullying" if p == 0 else "Bullying" for p in preds]
             })
             with st.expander("View results", expanded=True):
-                st.dataframe(paste_df, width='stretch')
+                st.dataframe(paste_df)
             flagged = sum(1 for p in preds if p == 1)
             st.caption(f"Total: {len(lines)} lines · Flagged as bullying: {flagged}")
     elif paste_input.strip() and not (tfidf and model):
@@ -290,7 +290,7 @@ with tab1:
                     up["predicted_label"] = preds
                     up["prediction"] = up["predicted_label"].map({0: "Non-bullying", 1: "Bullying"})
                     with st.expander("View results", expanded=True):
-                        st.dataframe(up, width='stretch')
+                        st.dataframe(up)
                     # Let user download results as CSV
                     st.download_button(
                         "Download results (CSV)",
@@ -376,7 +376,7 @@ with tab2:
             st.session_state.pred_total += len(preds)
             st.session_state.pred_flagged += int(sum(preds))
             with st.expander("Message-level results", expanded=True):
-                st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]], width='stretch')
+                st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]])
             # Per-sender summary: total messages, how many flagged, percentage
             summary = chat_df.groupby("sender")["bullying_label"].agg(["count", "sum"]).reset_index()
             summary.columns = ["Sender", "Total messages", "Flagged"]
@@ -384,7 +384,7 @@ with tab2:
             # clip(lower=1) avoids division by zero if someone has 0 messages
             summary["Flagged %"] = (summary["Flagged"] / total.clip(lower=1) * 100).round(1)
             st.subheader("Per-sender summary")
-            st.dataframe(summary, width='stretch')
+            st.dataframe(summary)
             export_df = chat_df[["timestamp", "sender", "message_text", "result"]]
             st.download_button(
                 "Export chat analysis (CSV)",
@@ -411,7 +411,7 @@ with tab3:
         st.metric("Total samples", len(df))
         st.metric("Bullying (1)", int((df["label"] == 1).sum()))
         st.metric("Non-bullying (0)", int((df["label"] == 0).sum()))
-        st.dataframe(df["label"].value_counts().rename("count"), width='stretch')
+        st.dataframe(df["label"].value_counts().rename("count"))
 
     # Prepare features (X) and labels (y)
     df["clean_text"] = df["text"].apply(clean_text)
@@ -446,7 +446,7 @@ with tab3:
                 st.text(report_str)
                 st.write("Confusion matrix:")
                 cm_df = pd.DataFrame(cm, index=["Actual 0", "Actual 1"], columns=["Pred 0", "Pred 1"])
-                st.dataframe(cm_df, width='stretch')
+                st.dataframe(cm_df)
                 col_a, col_b = st.columns(2)
                 with col_a:
                     st.download_button("Download report", report_str.encode("utf-8"), "classification_report.txt", "text/plain", key="dl_report")
