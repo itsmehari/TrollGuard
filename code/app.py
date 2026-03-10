@@ -1,20 +1,32 @@
 """
 TrollGuard – Cyberbullying Detection (Streamlit App)
 
+Main web application for text-based cyberbullying detection.
+Provides: single/batch prediction, paste text analysis, chat export analysis, model training.
+
 Run: streamlit run app.py
 """
 
+# =============================================================================
+# SETUP: Ensure project root is on path (required for Streamlit Cloud)
+# =============================================================================
 import os
 import sys
 
+# Resolve project root (directory containing app.py)
 ROOT = os.path.dirname(os.path.abspath(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
+# Change working directory so relative paths (dataset/, models/) resolve correctly
 os.chdir(ROOT)
 
+# =============================================================================
+# IMPORTS
+# =============================================================================
 import streamlit as st
 import pandas as pd
 import numpy as np
+# Core utilities
 from core.data_loader import (
     get_datasets_dir,
     load_parsed_datasets,
@@ -29,37 +41,54 @@ from core.model_utils import (
     get_artefact_dir,
     get_top_words,
 )
+# ML components
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import joblib
 
-# Config
-MAX_INPUT_CHARS = 50_000
-BATCH_CSV_LIMIT = 10_000
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+MAX_INPUT_CHARS = 50_000   # Max chars per text area / paste / upload (security + memory)
+BATCH_CSV_LIMIT = 10_000   # Max rows to process in batch CSV (prevents timeout)
 
+# =============================================================================
+# PAGE CONFIG
+# =============================================================================
 st.set_page_config(page_title="TrollGuard", page_icon="🛡️", layout="wide")
 
 
+# =============================================================================
+# LAZY MODEL LOADER (cached to reduce Streamlit Cloud startup memory)
+# =============================================================================
 @st.cache_resource
 def _load_model():
-    """Lazy-load model (reduces Streamlit Cloud memory at startup)."""
+    """Load TF-IDF vectoriser and Logistic Regression model. Cached across reruns."""
     return load_model_and_vectoriser()
 
 
-# Session state for prediction counts
+# =============================================================================
+# SESSION STATE: prediction counts for sidebar stats
+# =============================================================================
 if "pred_total" not in st.session_state:
     st.session_state.pred_total = 0
 if "pred_flagged" not in st.session_state:
     st.session_state.pred_flagged = 0
 
+# =============================================================================
+# HEADER
+# =============================================================================
 st.title("🛡️ TrollGuard – Cyberbullying Detector")
 st.caption("NLP-based text classification for bullying detection")
 
+# Load model (cached; may be None if no model files exist)
 tfidf, model = _load_model()
 
-# Sidebar: model, datasets, stats
+# =============================================================================
+# SIDEBAR: Model status, session stats, feature importance, datasets
+# =============================================================================
 with st.sidebar:
     st.header("Model")
     if tfidf is not None and model is not None:
@@ -75,6 +104,7 @@ with st.sidebar:
     st.metric("Predictions (this session)", st.session_state.pred_total)
     st.metric("Flagged", st.session_state.pred_flagged)
 
+    # Feature importance: top bullying/safe words from model coefficients
     if tfidf and model:
         with st.expander("Feature importance"):
             bull, safe = get_top_words(tfidf, model, 8)
@@ -89,14 +119,19 @@ with st.sidebar:
         st.info("Using sample fallback data")
     st.metric("Samples", len(df_raw))
 
+# =============================================================================
+# TABS: Predict | Chat analysis | Train model | About
+# =============================================================================
 tab1, tab2, tab3, tab4 = st.tabs(["🔍 Predict", "💬 Chat analysis", "📊 Train model", "ℹ️ About"])
 
-# Tab 1: Single / paste / batch prediction
+# -----------------------------------------------------------------------------
+# TAB 1: PREDICT (single text, paste bulk, batch CSV)
+# -----------------------------------------------------------------------------
 with tab1:
     st.subheader("Text prediction")
     text_input = st.text_area("Enter text to classify", placeholder="Type or paste a message...", max_chars=MAX_INPUT_CHARS)
     if text_input.strip():
-        text_input = text_input[:MAX_INPUT_CHARS]
+        text_input = text_input[:MAX_INPUT_CHARS]  # Enforce limit
         if not (tfidf and model):
             st.warning("Model not loaded. Go to **Train model** tab to train.")
         else:
@@ -121,7 +156,7 @@ with tab1:
             st.session_state.pred_flagged += int(sum(preds))
             paste_df = pd.DataFrame({"Text": lines, "Prediction": ["Non-bullying" if p == 0 else "Bullying" for p in preds]})
             with st.expander("View results", expanded=True):
-                st.dataframe(paste_df, use_container_width=True)
+                st.dataframe(paste_df, width='stretch')
             flagged = sum(1 for p in preds if p == 1)
             st.caption(f"Total: {len(lines)} lines · Flagged as bullying: {flagged}")
     elif paste_input.strip() and not (tfidf and model):
@@ -159,13 +194,15 @@ with tab1:
                     up["predicted_label"] = preds
                     up["prediction"] = up["predicted_label"].map({0: "Non-bullying", 1: "Bullying"})
                     with st.expander("View results", expanded=True):
-                        st.dataframe(up, use_container_width=True)
+                        st.dataframe(up, width='stretch')
                     st.download_button("Download results (CSV)", up.to_csv(index=False).encode("utf-8"),
                                        "trollguard_predictions.csv", "text/csv")
         except Exception as e:
             st.error(f"Error: {e}")
 
-# Tab 2: Chat export (upload or paste only – no preload)
+# -----------------------------------------------------------------------------
+# TAB 2: CHAT ANALYSIS (upload or paste; WhatsApp/Telegram/Discord)
+# -----------------------------------------------------------------------------
 with tab2:
     st.subheader("Chat export analysis")
     format_hint = st.selectbox("Chat format", ["auto", "whatsapp", "telegram", "discord"], format_func=lambda x: {"auto": "Auto-detect", "whatsapp": "WhatsApp", "telegram": "Telegram", "discord": "Discord"}[x])
@@ -183,7 +220,7 @@ with tab2:
         if st.button("Analyze chat", key="chat_analyze_btn") and pasted.strip():
             try:
                 chat_df = parse_chat_from_string(pasted[:MAX_INPUT_CHARS], format_hint)
-                st.session_state["chat_analysis_result"] = chat_df
+                st.session_state["chat_analysis_result"] = chat_df  # Persist for reruns
             except Exception as e:
                 st.error(f"Error parsing chat: {e}")
         if "chat_analysis_result" in st.session_state and mode == "Paste chat text":
@@ -199,6 +236,7 @@ with tab2:
     else:
         try:
             chat_df = chat_df.copy()
+            # Optional date range filter
             if not chat_df.empty:
                 date_col = pd.to_datetime(chat_df["timestamp"], errors="coerce")
                 valid_dates = date_col.dropna()
@@ -218,19 +256,21 @@ with tab2:
             st.session_state.pred_total += len(preds)
             st.session_state.pred_flagged += int(sum(preds))
             with st.expander("Message-level results", expanded=True):
-                st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]], use_container_width=True)
+                st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]], width='stretch')
             summary = chat_df.groupby("sender")["bullying_label"].agg(["count", "sum"]).reset_index()
             summary.columns = ["Sender", "Total messages", "Flagged"]
             total = summary["Total messages"]
-            summary["Flagged %"] = (summary["Flagged"] / total.clip(lower=1) * 100).round(1)
+            summary["Flagged %"] = (summary["Flagged"] / total.clip(lower=1) * 100).round(1)  # clip avoids div by zero
             st.subheader("Per-sender summary")
-            st.dataframe(summary, use_container_width=True)
+            st.dataframe(summary, width='stretch')
             export_df = chat_df[["timestamp", "sender", "message_text", "result"]]
             st.download_button("Export chat analysis (CSV)", export_df.to_csv(index=False).encode("utf-8"), "trollguard_chat_analysis.csv", "text/csv", key="chat_export")
         except Exception as e:
             st.error(f"Error during analysis: {str(e)}")
 
-# Tab 3: Train
+# -----------------------------------------------------------------------------
+# TAB 3: TRAIN MODEL
+# -----------------------------------------------------------------------------
 with tab3:
     st.subheader("Train model")
     df = load_parsed_datasets()
@@ -241,7 +281,7 @@ with tab3:
         st.metric("Total samples", len(df))
         st.metric("Bullying (1)", int((df["label"] == 1).sum()))
         st.metric("Non-bullying (0)", int((df["label"] == 0).sum()))
-        st.dataframe(df["label"].value_counts().rename("count"), use_container_width=True)
+        st.dataframe(df["label"].value_counts().rename("count"), width='stretch')
     df["clean_text"] = df["text"].apply(clean_text)
     X = df["clean_text"].values
     y = df["label"].values
@@ -263,7 +303,7 @@ with tab3:
             st.text(report_str)
             st.write("Confusion matrix:")
             cm_df = pd.DataFrame(cm, index=["Actual 0", "Actual 1"], columns=["Pred 0", "Pred 1"])
-            st.dataframe(cm_df, use_container_width=True)
+            st.dataframe(cm_df, width='stretch')
             col_a, col_b = st.columns(2)
             with col_a:
                 st.download_button("Download report", report_str.encode("utf-8"), "classification_report.txt", "text/plain", key="dl_report")
@@ -285,7 +325,9 @@ with tab3:
             joblib.dump(mdl, os.path.join(ad, "logreg_model.joblib"))
             st.info("Model saved. Refresh the page to use it.")
 
-# Tab 4: About
+# -----------------------------------------------------------------------------
+# TAB 4: ABOUT
+# -----------------------------------------------------------------------------
 with tab4:
     st.subheader("About TrollGuard")
     st.write("""
