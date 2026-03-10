@@ -90,9 +90,9 @@ I am grateful to the Department of Computer Science and **[College Name]** for t
 
 The rapid growth of social media and online communication platforms has led to a parallel rise in cyberbullying, harassment, and toxic behaviour. Manual moderation is slow, subjective, and difficult to scale. This project, titled **TrollGuard**, implements a text-based cyberbullying detection system that uses data preprocessing, exploratory data analysis, feature engineering, and classification models to identify harmful messages.
 
-The system focuses on short text messages such as comments, tweets, and chat lines. Publicly available labelled datasets are collected and cleaned to remove noise (URLs, emojis, unnecessary symbols). Exploratory Data Analysis (EDA) is performed to understand label distribution, message length, and text characteristics. A baseline classifier is developed using TF-IDF features and Logistic Regression. An optional advanced approach can use contextual sentence representations. The models are evaluated using accuracy, precision, recall, F1-score, and confusion matrix analysis.
+The system focuses on short text messages such as comments, tweets, and chat lines. Publicly available labelled datasets are collected, augmented, and cleaned to remove noise (URLs, emojis, unnecessary symbols). Exploratory Data Analysis (EDA) is performed to understand label distribution, message length, and text characteristics. A baseline classifier is developed using TF-IDF features and Logistic Regression. The model is evaluated using accuracy, precision, recall, F1-score, and confusion matrix analysis.
 
-Results show that a simple baseline model achieves reasonable performance, while advanced representations can improve sensitivity to subtle bullying. The project demonstrates an end-to-end pipeline that can be extended towards practical moderation tools in educational or organisational settings.
+Results show that the baseline model achieves reasonable performance (approximately 85–92% accuracy). The Streamlit web application supports single-text prediction, paste bulk analysis, batch CSV upload (up to 10,000 rows with progress bar), and multi-format chat export analysis (WhatsApp, Telegram, Discord) with date filtering, per-sender summaries, and CSV export. The system also includes a Train tab for in-app model retraining with downloadable reports and feature importance. The project demonstrates an end-to-end pipeline suitable for moderation assistance in educational or organisational settings.
 
 **Keywords:** Cyberbullying, Text Classification, Toxic Comments, Logistic Regression, TF-IDF, NLP, Machine Learning
 
@@ -102,7 +102,7 @@ Results show that a simple baseline model achieves reasonable performance, while
 
 The widespread adoption of smartphones, affordable data, and social networking platforms has fundamentally changed how people communicate. Information flows faster than ever, but a significant downside has emerged in the form of cyberbullying and online harassment.
 
-Cyberbullying refers to bullying behaviour carried out through digital channels: social media posts, comments, messages, and group chats. It can take the form of direct insults, repeated mocking, threats, exclusion, or indirect remarks that damage a person’s self-esteem and mental health. Manual monitoring of all online communication is unrealistic. TrollGuard is designed as a B.Sc. final year project that addresses this need by demonstrating how text data can be collected, cleaned, analysed, and used to train supervised classification models.
+Cyberbullying refers to bullying behaviour carried out through digital channels: social media posts, comments, messages, and group chats. It can take the form of direct insults, repeated mocking, threats, exclusion, or indirect remarks that damage a person's self-esteem and mental health. Manual monitoring of all online communication is unrealistic. TrollGuard is designed as a B.Sc. final year project that addresses this need by demonstrating how text data can be collected, cleaned, augmented, analysed, and used to train supervised classification models, with a Streamlit web interface for predictions and chat analysis.
 
 ---
 
@@ -119,7 +119,7 @@ Online platforms allow people to post content instantly and anonymously. Studies
 3. **Neural models** – Word embeddings, CNN, RNN  
 4. **Contextual models** – Transformers, contextual embeddings
 
-TrollGuard positions itself at the junction between classical and contextual approaches.
+TrollGuard positions itself at the classical ML approach, with a clear path to more advanced models.
 
 ### 2.3 Related Applications
 
@@ -138,19 +138,26 @@ The same techniques apply to: toxicity and hate speech detection, spam detection
 
 ### 3.2 Software Requirements
 
-- **Python 3.x** – Programming language  
-- **Google Colab** – Cloud notebook (optional)  
-- **Libraries:** pandas, numpy, scikit-learn, matplotlib, seaborn, joblib, streamlit
+- **Python 3.8+** – Programming language  
+- **Libraries:** pandas (≥1.3.0), numpy (≥1.20.0), scikit-learn (1.7.2), joblib (≥1.1.0), streamlit (≥1.20.0)  
+- **Optional:** Google Colab, Kaggle API, Hugging Face datasets (for data scripts)
 
 ### 3.3 Functional Requirements
 
-- Load labelled text datasets (CSV)  
-- Preprocess and clean text  
+- Load labelled text datasets (CSV) from `dataset/` or `datasets/`  
+- Preprocess and clean text (lowercase, remove URLs, @mentions, #hashtags)  
 - Perform EDA and visualisation  
 - Train TF-IDF + Logistic Regression model  
-- Evaluate using standard metrics  
-- Support single-text and batch prediction  
-- Parse WhatsApp-style chat exports and analyse per-sender
+- Evaluate using accuracy, precision, recall, F1, confusion matrix  
+- Support single-text, paste-text bulk analysis, and batch CSV prediction (progress bar, 10K row limit)  
+- Parse multi-format chat exports (WhatsApp, Telegram, Discord) via upload or paste; format auto-detect  
+- Optional date filter for chat analysis  
+- Per-sender summary (total messages, flagged count, flagged %)  
+- Export chat analysis and training reports to CSV  
+- Display feature importance (top bullying/safe words) in sidebar and Train tab  
+- Session statistics (predictions, flagged count) in sidebar  
+- Deploy on Streamlit Cloud with lazy model loading  
+- Retrain model from app or via `train_model.py` / `scripts/train_and_save.py`
 
 ---
 
@@ -164,17 +171,37 @@ Raw Text → Cleaning → TF-IDF → Logistic Regression → Prediction (0/1)
 
 ### 4.2 Data Flow
 
-1. **Input:** CSV files with `Text` and `oh_label` columns  
+1. **Input:** CSV files with `Text` and `oh_label` columns; or chat text (upload/paste)  
 2. **Preprocessing:** Lowercase, remove URLs, mentions, hashtags, non-alpha  
-3. **Feature engineering:** TF-IDF with n-grams (1, 2)  
-4. **Model:** Logistic Regression  
+3. **Feature engineering:** TF-IDF with n-grams (1, 2), min_df=2, max_df=0.95  
+4. **Model:** Logistic Regression (max_iter=300)  
 5. **Output:** Binary label (0 = non-bullying, 1 = bullying)
 
 ### 4.3 Chat Export Flow
 
 ```
-WhatsApp export (.txt) → Parse (timestamp, sender, message) → Clean → Predict → Aggregate per sender
+Upload / Paste chat (.txt) → Format selector (WhatsApp/Telegram/Discord/Auto) → Parse (timestamp, sender, message) → Optional date filter → Clean → Predict → Aggregate per sender → Export CSV
 ```
+
+**Chat formats supported:**
+- **WhatsApp:** `DD/MM/YYYY, HH:MM - Sender: message`  
+- **Telegram:** `DD.MM.YYYY, HH:MM - Sender: message` (dots converted to slashes)  
+- **Discord:** `[DD/MM/YYYY HH:MM] Sender: message`
+
+Malformed lines are kept with sender="Unknown", timestamp=1970-01-01.
+
+### 4.4 Configuration Limits
+
+- **MAX_INPUT_CHARS:** 50,000 characters per text area / paste / upload  
+- **BATCH_CSV_LIMIT:** 10,000 rows per batch CSV
+
+### 4.5 Deployment
+
+- **Streamlit Cloud:** App URL: https://trollguard-eem9mwmcp2gtqwff95wu7v.streamlit.app/  
+- **GitHub:** https://github.com/itsmehari/TrollGuard  
+- **Main file:** `code/app.py`  
+- **Theme:** Light (`.streamlit/config.toml`)  
+- **Model storage:** `models/` (primary) or `outputs/` (fallback)
 
 ---
 
@@ -182,14 +209,17 @@ WhatsApp export (.txt) → Parse (timestamp, sender, message) → Clean → Pred
 
 | Module | Description |
 |--------|-------------|
-| **Data Loader** | Loads `*_parsed_dataset.csv` files, normalises labels to binary |
-| **Text Cleaning** | Lowercase, remove URLs, @mentions, #hashtags, non-alpha |
-| **EDA** | Class distribution, text length histogram, basic statistics |
-| **Feature Engineering** | TF-IDF vectorisation (ngram_range=(1,2), min_df=2, max_df=0.95) |
-| **Model Training** | Logistic Regression (max_iter=300) |
-| **Evaluation** | Accuracy, classification report, confusion matrix |
-| **Prediction** | Single text, batch CSV, chat export analysis |
-| **Streamlit App** | Web UI for prediction, chat analysis, and training |
+| **Data Loader** | `core/data_loader.py` – Loads `*_parsed_dataset.csv`; normalises labels; supports `datasets/` and `dataset/`; `get_sample_fallback()` when no CSVs |
+| **Text Cleaning** | `core/model_utils.py` – `clean_text()`: lowercase, remove URLs, @mentions, #hashtags, non-alpha |
+| **Chat Parser** | `core/chat_parser.py` – `parse_chat_from_string()` for WhatsApp, Telegram, Discord; `format_hint`: auto/whatsapp/telegram/discord; malformed lines → Unknown |
+| **EDA** | Class distribution, text length histogram, dataset stats |
+| **Feature Engineering** | TF-IDF (ngram_range=(1,2), min_df=2, max_df=0.95) |
+| **Model Training** | Logistic Regression (max_iter=300); `train_model.py`, `scripts/train_and_save.py` |
+| **Feature Importance** | `get_top_words()` – top bullying/safe words from coefficients; guards against vocab/coef length mismatch |
+| **Evaluation** | Accuracy, classification report, confusion matrix; downloadable reports |
+| **Prediction** | Single text, paste bulk, batch CSV (progress bar); chat analysis with date filter, per-sender summary, CSV export |
+| **Streamlit App** | Tabs: Predict, Chat analysis, Train model, About; sidebar: model status, session stats, feature importance, datasets |
+| **Scripts** | `augment_data.py` (synonym/swap augmentation), `generate_synthetic_data.py` (template-based), `download_datasets.py` (Kaggle, Hugging Face), `train_and_save.py` (retrain for sklearn version compatibility) |
 
 ---
 
@@ -197,18 +227,26 @@ WhatsApp export (.txt) → Parse (timestamp, sender, message) → Clean → Pred
 
 ### 6.1 Core Implementation
 
-- **Data loading:** `core/data_loader.py` – loads all `*_parsed_dataset.csv` files  
-- **Model utilities:** `core/model_utils.py` – `clean_text`, `predict_text`, `predict_batch`  
-- **Chat parser:** `core/chat_parser.py` – WhatsApp format parsing  
-- **Streamlit app:** `app.py` – Predict, Chat analysis, Train model, About
+- **Data loading:** `core/data_loader.py` – `load_parsed_datasets()`, `get_datasets_dir()`, `get_project_root()` (Colab/Drive/local), `get_sample_fallback()`  
+- **Model utilities:** `core/model_utils.py` – `clean_text`, `load_model_and_vectoriser`, `predict_text`, `predict_batch`, `get_top_words`, `get_artefact_dir`  
+- **Chat parser:** `core/chat_parser.py` – `parse_chat_from_string()` for WhatsApp, Telegram, Discord; malformed lines preserved  
+- **Streamlit app:** `app.py` – Predict (single, paste bulk, batch CSV), Chat analysis (upload/paste, format selector, date filter, per-sender summary, export), Train model (stats, feature importance, downloadable report/confusion matrix), About  
+- **Training:** `train_model.py` – full training; `scripts/train_and_save.py` – retrain (max 30k samples) for sklearn version compatibility
 
 ### 6.2 Configuration
 
-The system auto-detects project root for both Colab/Drive and local environments. It supports `dataset/` or `datasets/` folder naming.
+- Project root auto-detection for Colab (`/content/drive/MyDrive/TrollGuard_Project*`), Streamlit Cloud, and local runs  
+- Supports `dataset/` and `datasets/` folder names  
+- Lazy model loading via `@st.cache_resource`  
+- Input limits: 50,000 chars; 10,000 rows for batch CSV  
+- Sample fallback when no datasets present
 
-### 6.3 Deployment Target
+### 6.3 Deployment
 
-Streamlit Cloud (or similar). The app runs with sample fallback data when no datasets are present.
+- **Streamlit Cloud:** https://trollguard-eem9mwmcp2gtqwff95wu7v.streamlit.app/  
+- **GitHub:** https://github.com/itsmehari/TrollGuard  
+- **Theme:** Light (`.streamlit/config.toml`)  
+- Runs with sample fallback data when no datasets are present
 
 ---
 
@@ -216,23 +254,24 @@ Streamlit Cloud (or similar). The app runs with sample fallback data when no dat
 
 ### 7.1 Data Sources
 
-Eight publicly available parsed datasets:
+Parsed datasets in `dataset/` or `datasets/` (combined ~540,000+ rows):
 
-- `aggression_parsed_dataset.csv`  
-- `attack_parsed_dataset.csv`  
-- `kaggle_parsed_dataset.csv`  
-- `toxicity_parsed_dataset.csv`  
-- `twitter_parsed_dataset.csv`  
-- `twitter_racism_parsed_dataset.csv`  
-- `twitter_sexism_parsed_dataset.csv`  
+- `aggression_parsed_dataset.csv`, `attack_parsed_dataset.csv`, `kaggle_parsed_dataset.csv`  
+- `toxicity_parsed_dataset.csv`, `twitter_parsed_dataset.csv`  
+- `twitter_racism_parsed_dataset.csv`, `twitter_sexism_parsed_dataset.csv`  
 - `youtube_parsed_dataset.csv`  
+- `augmented_parsed_dataset.csv` (from `scripts/augment_data.py`)  
+- `synthetic_parsed_dataset.csv` (from `scripts/generate_synthetic_data.py`)  
+- `olid_parsed_dataset.csv`, `hate_speech_parsed_dataset.csv` (from `scripts/download_datasets.py`)  
+- `jigsaw_toxic_parsed_dataset.csv` (Kaggle Jigsaw)
 
-Combined size: ~449,000 rows. Class distribution: ~87% non-bullying, ~13% bullying.
+Class distribution approximately 87% non-bullying, 13% bullying.
 
 ### 7.2 Dataset Format
 
 - **Required columns:** `Text`, `oh_label` (0 = non-bullying, 1 = bullying)  
-- **Chat export:** `sample_chat.txt` in format `DD/MM/YYYY, HH:MM - Sender: message`
+- **Label normalisation:** String labels like "none", "normal", "non-toxic" mapped to 0  
+- **Chat formats:** See Chapter 4.3
 
 ### 7.3 Data Loader Utility
 
@@ -252,11 +291,11 @@ See `core/data_loader.py` and `dataset/DATASET_FORMAT.md` for format documentati
 
 ### 8.2 Baseline Results
 
-The Logistic Regression + TF-IDF baseline typically achieves accuracy in the 70–85% range. F1 for the bullying class is lower due to class imbalance.
+The Logistic Regression + TF-IDF baseline achieves accuracy in the 85–92% range on held-out test data. F1 for the bullying class is lower due to class imbalance. Feature importance (top bullying/safe words) is available in the sidebar and Train tab.
 
 ### 8.3 Chat Export Analysis
 
-The system produces per-message predictions and per-sender summaries (total messages, flagged count, flagged rate).
+The system produces per-message predictions and per-sender summaries (total messages, flagged count, flagged %). Users can filter by date range and export results to CSV.
 
 ---
 
@@ -265,20 +304,22 @@ The system produces per-message predictions and per-sender summaries (total mess
 1. **Language:** English only; no regional languages or code-mixed text  
 2. **Context:** Message-level analysis; limited conversation-level context  
 3. **Multimodality:** No image, video, or audio analysis  
-4. **Dataset bias:** Performance depends on training data; may not generalise to all bullying types  
-5. **Real-time:** Offline/batch processing; no live API deployment by default  
-6. **False positives/negatives:** Sarcasm, coded language, and subtle aggression remain challenging  
+4. **Dataset bias:** Performance depends on training data  
+5. **Real-time:** Offline/batch processing; no live API by default  
+6. **Input limits:** 50K chars, 10K batch rows  
+7. **Sarcasm/coded language:** Challenging for TF-IDF + LR
 
 ---
 
 ## Chapter 10 – Future Work
 
-1. **Multilingual support** – Handle regional languages and code-mixing  
-2. **Real-time API** – REST API for integration into chat applications  
+1. **Multilingual support** – Regional languages and code-mixing  
+2. **Real-time API** – REST API for integration  
 3. **User feedback loop** – Moderator corrections for retraining  
-4. **Multimodal analysis** – Image, voice, and video content  
-5. **Explainability** – Show which words/phrases triggered the flag  
-6. **Transformer-based models** – BERT or similar for contextual understanding  
+4. **Multimodal analysis** – Image, voice, video  
+5. **Transformer-based models** – BERT or similar
+
+*Note: Explainability via feature importance (top bullying/safe words) is already implemented.*
 
 ---
 
@@ -286,36 +327,36 @@ The system produces per-message predictions and per-sender summaries (total mess
 
 TrollGuard can be positioned as:
 
-- **Educational:** Tool for schools and colleges to monitor group chats and forums  
-- **SaaS:** Subscription-based moderation API for small platforms  
-- **Consulting:** Custom models for organisations with domain-specific data  
-- **Open source:** Community-driven improvements with optional premium support  
+- **Educational:** Tool for schools and colleges  
+- **SaaS:** Subscription-based moderation API  
+- **Consulting:** Custom models for organisations  
+- **Open source:** Community-driven improvements
 
 ---
 
 ## Chapter 12 – Conclusion
 
-TrollGuard demonstrates how supervised text classification can be applied to cyberbullying detection. The pipeline—from dataset loading and cleaning to feature engineering, model training, evaluation, and deployment—offers a practical example suitable for a B.Sc. final year project.
+TrollGuard demonstrates how supervised text classification can be applied to cyberbullying detection. The pipeline—from dataset loading, augmentation, and cleaning to feature engineering, model training, evaluation, and deployment—offers a practical example suitable for a B.Sc. final year project.
 
-The TF-IDF + Logistic Regression baseline shows that simple approaches can flag a significant proportion of harmful messages. More advanced representations can improve performance for subtle cases. Responsible deployment will require attention to fairness, privacy, and human-in-the-loop moderation.
+The TF-IDF + Logistic Regression baseline shows that simple approaches can flag a significant proportion of harmful messages. The Streamlit app supports single and bulk prediction, multi-format chat analysis with date filtering and per-sender summaries, and in-app retraining with downloadable reports. Responsible deployment will require attention to fairness, privacy, and human-in-the-loop moderation.
 
 ---
 
 ## References
 
-1. scikit-learn Documentation. *Text feature extraction – TfidfVectorizer.* [https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html)
+1. scikit-learn Documentation. *Text feature extraction – TfidfVectorizer.* https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html
 
-2. scikit-learn Documentation. *Logistic Regression.* [https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression](https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression)
+2. scikit-learn Documentation. *Logistic Regression.* https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression
 
-3. Python Software Foundation. *Python 3 Documentation.* [https://docs.python.org/3/](https://docs.python.org/3/)
+3. Python Software Foundation. *Python 3 Documentation.* https://docs.python.org/3/
 
-4. Streamlit. *Streamlit Documentation.* [https://docs.streamlit.io/](https://docs.streamlit.io/)
+4. Streamlit. *Streamlit Documentation.* https://docs.streamlit.io/
 
 5. NAAC / University affiliation documents (as applicable).
 
-6. Research on toxic comment classification and cyberbullying detection (cite specific papers used).
+6. Research on toxic comment classification and cyberbullying detection.
 
-7. Kaggle / public dataset sources used in the project.
+7. Kaggle / Hugging Face / public dataset sources used.
 
 ---
 
@@ -325,8 +366,10 @@ The TF-IDF + Logistic Regression baseline shows that simple approaches can flag 
 
 **Data loading:**
 ```python
-from core.data_loader import load_parsed_datasets
+from core.data_loader import load_parsed_datasets, get_sample_fallback
 df = load_parsed_datasets()
+if df.empty:
+    df = get_sample_fallback()
 ```
 
 **Text cleaning:**
@@ -337,14 +380,21 @@ cleaned = clean_text("Raw message with @user and http://url.com")
 
 **Prediction:**
 ```python
-from core.model_utils import load_model_and_vectoriser, predict_text
+from core.model_utils import load_model_and_vectoriser, predict_text, predict_batch
 tfidf, model = load_model_and_vectoriser()
 label = predict_text("Your message here", tfidf, model)
+labels_batch = predict_batch(["msg1", "msg2"], tfidf, model)
+```
+
+**Chat parsing (multi-format):**
+```python
+from core.chat_parser import parse_chat_from_string
+df = parse_chat_from_string(chat_text, format_hint="auto")  # or "whatsapp", "telegram", "discord"
 ```
 
 ### Appendix B – Screenshots and Diagrams
 
-*(Insert screenshots: class distribution, confusion matrix, Streamlit app, etc.)*
+*(Insert screenshots: class distribution, confusion matrix, Streamlit app tabs, sidebar, chat analysis with date filter, per-sender summary.)*
 
 ### Appendix C – Dataset Format
 

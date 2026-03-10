@@ -1,9 +1,26 @@
 """
-TrollGuard – Generate synthetic bullying / non-bullying examples.
+================================================================================
+TrollGuard – Synthetic Data Generator
+================================================================================
 
-Usage: python scripts/generate_synthetic_data.py [--count 5000] [--output dataset/synthetic_parsed_dataset.csv]
+WHAT THIS FILE DOES (in simple terms):
+Sometimes you don't have enough labelled data. This script creates NEW
+fake-but-realistic messages using templates. For example:
+  - Bullying: "you are so {adj}" -> "you are so stupid" (random adjective)
+  - Safe: "thanks for your help" (no placeholder, used as-is)
 
-Uses templates (no API required). For LLM-based generation, set OPENAI_API_KEY and use --llm.
+No API or internet required - everything is predefined. Good for:
+  - Testing the pipeline with more data
+  - Bootstrapping when you have few real examples
+  - Creating balanced datasets (half bullying, half safe)
+
+OUTPUT: dataset/synthetic_parsed_dataset.csv
+
+Usage: python scripts/generate_synthetic_data.py [--count 5000] [--output path]
+  --count: How many rows to generate (default 5000)
+  --output: Custom output path (optional)
+
+================================================================================
 """
 
 import os
@@ -11,6 +28,7 @@ import sys
 import argparse
 import random
 
+# Path setup
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
@@ -18,7 +36,8 @@ if ROOT not in sys.path:
 import pandas as pd
 from core.data_loader import get_datasets_dir
 
-# Template-based synthetic examples
+# Bullying templates. {adj}, {verb}, {noun} are placeholders we fill randomly.
+# Example: "you are so {adj}" with adj="stupid" -> "you are so stupid"
 BULLY_TEMPLATES = [
     "you are so {adj}",
     "you {verb} {noun}",
@@ -41,6 +60,7 @@ BULLY_TEMPLATES = [
     "you make me sick",
 ]
 
+# Safe templates - no placeholders, used as-is
 SAFE_TEMPLATES = [
     "thanks for your help",
     "have a good day",
@@ -59,12 +79,17 @@ SAFE_TEMPLATES = [
     "no problem at all",
 ]
 
+# Options for filling placeholders in bullying templates
 ADJECTIVES = ["stupid", "ugly", "dumb", "pathetic", "useless", "annoying", "worthless", "disgusting"]
 VERBS = ["ruin", "destroy", "hate", "deserve"]
 NOUNS = ["loser", "idiot", "failure", "nobody", "waste", "joke", "freak"]
 
 
 def fill_template(template: str) -> str:
+    """
+    Replace {adj}, {verb}, {noun} with random choices from our lists.
+    Example: "you are so {adj}" -> "you are so stupid" or "you are so ugly"
+    """
     placeholders = {"{adj}": ADJECTIVES, "{verb}": VERBS, "{noun}": NOUNS}
     out = template
     for ph, opts in placeholders.items():
@@ -74,7 +99,10 @@ def fill_template(template: str) -> str:
 
 
 def generate_template_based(count: int) -> pd.DataFrame:
-    """Generate using templates (no API)."""
+    """
+    Generate 'count' rows: roughly half bullying (label=1), half safe (label=0).
+    Shuffle so they're mixed. Each row has Text and oh_label.
+    """
     rows = []
     half = count // 2
     for _ in range(half):
@@ -89,8 +117,8 @@ def generate_template_based(count: int) -> pd.DataFrame:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--count", type=int, default=5000)
-    ap.add_argument("--output", default=None)
+    ap.add_argument("--count", type=int, default=5000, help="Number of rows to generate")
+    ap.add_argument("--output", default=None, help="Output CSV path (optional)")
     args = ap.parse_args()
 
     df = generate_template_based(args.count)

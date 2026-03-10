@@ -1,160 +1,250 @@
 """
-TrollGuard – Cyberbullying Detection (Streamlit App)
+================================================================================
+TrollGuard – Main Web Application (Streamlit)
+================================================================================
 
-Main web application for text-based cyberbullying detection.
-Provides: single/batch prediction, paste text analysis, chat export analysis, model training.
+WHAT THIS FILE DOES (in simple terms):
+This is the main "front-end" of TrollGuard. When you run `streamlit run app.py`,
+a web page opens where users can:
+  1. Type a message and see if it's classified as bullying or not
+  2. Paste many messages at once and get predictions for each
+  3. Upload a CSV file with a text column for bulk analysis
+  4. Upload or paste chat exports (WhatsApp, Telegram, Discord) and analyse them
+  5. Train a new model using the datasets in the dataset/ folder
 
-Run: streamlit run app.py
+Think of this file as the "control centre" that connects the user interface
+(buttons, text boxes, tables) with the "brain" (the model that detects bullying).
+
+Run from the code/ folder:  streamlit run app.py
+================================================================================
 """
 
 # =============================================================================
-# SETUP: Ensure project root is on path (required for Streamlit Cloud)
+# SECTION 1: PATH SETUP (Why we need this)
 # =============================================================================
+# When you run an app, Python needs to know where to find other files in your
+# project (like dataset/, models/, and the core/ package). On Streamlit Cloud,
+# the app may run from a different directory. So we:
+#   - Find the folder containing app.py (that's our "project root")
+#   - Add it to Python's search path (so "from core.xxx" works)
+#   - Change the current working directory (so "dataset/" and "models/" paths work)
+
 import os
 import sys
 
-# Resolve project root (directory containing app.py)
+# __file__ = path to this app.py file. dirname = the folder containing it.
+# abspath makes it a full path (e.g. C:\...\code\app.py -> root = C:\...\code)
 ROOT = os.path.dirname(os.path.abspath(__file__))
+
+# sys.path is where Python looks when you write "import something".
+# We add ROOT so "from core.data_loader import ..." finds the core folder.
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
-# Change working directory so relative paths (dataset/, models/) resolve correctly
+
+# chdir = "change directory". Now "dataset/" means ROOT/dataset/, "models/" means ROOT/models/
 os.chdir(ROOT)
 
+
 # =============================================================================
-# IMPORTS
+# SECTION 2: IMPORT LIBRARIES
 # =============================================================================
-import streamlit as st
-import pandas as pd
-import numpy as np
-# Core utilities
+
+import streamlit as st   # Creates the web interface (buttons, text boxes, tabs)
+import pandas as pd      # For tables and data (like Excel in Python)
+import numpy as np       # For numbers and arrays
+
+# Our own modules (the "backend" logic):
 from core.data_loader import (
-    get_datasets_dir,
-    load_parsed_datasets,
-    get_sample_fallback,
+    get_datasets_dir,      # Returns path to dataset/ folder
+    load_parsed_datasets,  # Loads all *_parsed_dataset.csv files
+    get_sample_fallback,   # Returns 5 sample messages if no datasets exist
 )
-from core.chat_parser import parse_chat_from_string
+from core.chat_parser import parse_chat_from_string  # Parses WhatsApp/Telegram/Discord chat text
 from core.model_utils import (
-    clean_text,
-    load_model_and_vectoriser,
-    predict_text,
-    predict_batch,
-    get_artefact_dir,
-    get_top_words,
+    clean_text,              # Removes URLs, @mentions, etc. from text
+    load_model_and_vectoriser,  # Loads the trained model from disk
+    predict_text,            # Predict bullying (0 or 1) for one message
+    predict_batch,           # Predict for many messages at once
+    get_artefact_dir,        # Path to models/ folder (where we save the model)
+    get_top_words,           # Which words the model thinks indicate bullying vs safe
 )
-# ML components
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import joblib
+
+# Machine learning libraries:
+from sklearn.feature_extraction.text import TfidfVectorizer  # Converts text to numbers
+from sklearn.linear_model import LogisticRegression         # The classifier (bullying or not)
+from sklearn.model_selection import train_test_split        # Splits data for training
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+)  # Measures how well the model performs
+import joblib  # Saves and loads Python objects (our model) to/from disk
+
 
 # =============================================================================
-# CONFIGURATION
+# SECTION 3: SAFETY LIMITS (Prevents abuse and crashes)
 # =============================================================================
-MAX_INPUT_CHARS = 50_000   # Max chars per text area / paste / upload (security + memory)
-BATCH_CSV_LIMIT = 10_000   # Max rows to process in batch CSV (prevents timeout)
+# Without limits, someone could paste a million characters and crash the app or
+# upload a CSV with 1 million rows and freeze the server. These limits protect us.
+
+MAX_INPUT_CHARS = 50_000   # Max characters per text box or paste (50 thousand)
+BATCH_CSV_LIMIT = 10_000   # Max rows to process in a batch CSV (10 thousand)
+
 
 # =============================================================================
-# PAGE CONFIG
+# SECTION 4: PAGE CONFIGURATION
 # =============================================================================
+# Sets the browser tab title, favicon (🛡️), and uses wide layout for tables.
 st.set_page_config(page_title="TrollGuard", page_icon="🛡️", layout="wide")
 
 
 # =============================================================================
-# LAZY MODEL LOADER (cached to reduce Streamlit Cloud startup memory)
+# SECTION 5: LAZY MODEL LOADER (Performance optimisation)
 # =============================================================================
+# Loading the model from disk takes time and memory. @st.cache_resource tells
+# Streamlit: "Run this function once and remember the result. Don't run it again
+# on every user interaction." This is called "caching" and makes the app faster,
+# especially important on Streamlit Cloud where memory is limited.
+
 @st.cache_resource
 def _load_model():
-    """Load TF-IDF vectoriser and Logistic Regression model. Cached across reruns."""
+    """
+    Load the TF-IDF vectoriser and Logistic Regression model from models/ folder.
+    Returns (tfidf, model) or (None, None) if files don't exist.
+    Cached so we only load once per session.
+    """
     return load_model_and_vectoriser()
 
 
 # =============================================================================
-# SESSION STATE: prediction counts for sidebar stats
+# SECTION 6: SESSION STATE (Remembering things across page reruns)
 # =============================================================================
+# Streamlit reruns the whole script every time the user clicks something. Without
+# session_state, our "prediction count" would reset to 0 each time. session_state
+# is like a small memory that persists across reruns for this user's session.
+
 if "pred_total" not in st.session_state:
-    st.session_state.pred_total = 0
+    st.session_state.pred_total = 0   # How many messages we've analysed this session
 if "pred_flagged" not in st.session_state:
-    st.session_state.pred_flagged = 0
+    st.session_state.pred_flagged = 0  # How many were flagged as bullying
+
 
 # =============================================================================
-# HEADER
+# SECTION 7: MAIN PAGE HEADER
 # =============================================================================
 st.title("🛡️ TrollGuard – Cyberbullying Detector")
 st.caption("NLP-based text classification for bullying detection")
 
-# Load model (cached; may be None if no model files exist)
+# Load the model (or get None if no model exists yet - user must train first)
 tfidf, model = _load_model()
 
+
 # =============================================================================
-# SIDEBAR: Model status, session stats, feature importance, datasets
+# SECTION 8: SIDEBAR (Left panel - model status, stats, feature importance)
 # =============================================================================
+
 with st.sidebar:
     st.header("Model")
+    # Check if model loaded successfully
     if tfidf is not None and model is not None:
-        st.success("Model loaded")
+        st.success("Model loaded")  # Green success message
         if st.button("Retrain model"):
+            # User can request retraining from sidebar
             st.session_state.train_requested = True
     else:
-        st.warning("No model found. Train from data.")
+        st.warning("No model found. Train from data.")  # Yellow warning
         st.session_state.train_requested = True
 
-    st.divider()
+    st.divider()  # Horizontal line
+
+    # Session statistics - how many predictions and how many flagged
     st.header("Session stats")
     st.metric("Predictions (this session)", st.session_state.pred_total)
     st.metric("Flagged", st.session_state.pred_flagged)
 
-    # Feature importance: top bullying/safe words from model coefficients
+    # Feature importance: Which words does the model associate with bullying vs safe?
+    # This helps explain why the model made its decision (interpretability).
     if tfidf and model:
-        with st.expander("Feature importance"):
+        with st.expander("Feature importance"):  # Collapsible section
             bull, safe = get_top_words(tfidf, model, 8)
             st.caption("Bullying: " + ", ".join(w for w, _ in bull[:5]))
             st.caption("Safe: " + ", ".join(w for w, _ in safe[:5]))
+
+    # Dataset info - where data is and how many samples
     st.header("Datasets")
     ds_dir = get_datasets_dir()
     st.text(f"Data: {ds_dir}")
     df_raw = load_parsed_datasets()
     if df_raw.empty:
         df_raw = get_sample_fallback()
-        st.info("Using sample fallback data")
+        st.info("Using sample fallback data")  # Blue info message
     st.metric("Samples", len(df_raw))
 
+
 # =============================================================================
-# TABS: Predict | Chat analysis | Train model | About
+# SECTION 9: MAIN TABS (Predict | Chat analysis | Train model | About)
 # =============================================================================
-tab1, tab2, tab3, tab4 = st.tabs(["🔍 Predict", "💬 Chat analysis", "📊 Train model", "ℹ️ About"])
+
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🔍 Predict",       # Single text, paste bulk, batch CSV
+    "💬 Chat analysis", # Upload/paste chat exports
+    "📊 Train model",   # Train a new model
+    "ℹ️ About"          # Project info
+])
+
 
 # -----------------------------------------------------------------------------
-# TAB 1: PREDICT (single text, paste bulk, batch CSV)
+# TAB 1: PREDICT - Three ways to get predictions
 # -----------------------------------------------------------------------------
+
 with tab1:
+    # ----- Sub-tab 1a: Single text prediction -----
     st.subheader("Text prediction")
-    text_input = st.text_area("Enter text to classify", placeholder="Type or paste a message...", max_chars=MAX_INPUT_CHARS)
+    text_input = st.text_area(
+        "Enter text to classify",
+        placeholder="Type or paste a message...",
+        max_chars=MAX_INPUT_CHARS
+    )
+
     if text_input.strip():
-        text_input = text_input[:MAX_INPUT_CHARS]  # Enforce limit
+        # User typed something - enforce limit and predict
+        text_input = text_input[:MAX_INPUT_CHARS]
         if not (tfidf and model):
             st.warning("Model not loaded. Go to **Train model** tab to train.")
         else:
-            pred = predict_text(text_input, tfidf, model)
+            pred = predict_text(text_input, tfidf, model)  # Returns 0 or 1
             st.session_state.pred_total += 1
             if pred == 1:
                 st.session_state.pred_flagged += 1
-                st.error("Prediction: **Bullying** (flagged)")
+                st.error("Prediction: **Bullying** (flagged)")  # Red
             else:
-                st.success("Prediction: **Non-bullying** (safe)")
+                st.success("Prediction: **Non-bullying** (safe)")  # Green
 
     st.divider()
+
+    # ----- Sub-tab 1b: Paste multiple lines -----
     st.subheader("Paste text analysis")
     st.caption("Paste multiple lines; each non-empty line will be analyzed separately.")
-    paste_input = st.text_area("Paste text to analyze", placeholder="Paste several messages here, one per line...", key="paste_text", max_chars=MAX_INPUT_CHARS)
+    paste_input = st.text_area(
+        "Paste text to analyze",
+        placeholder="Paste several messages here, one per line...",
+        key="paste_text",
+        max_chars=MAX_INPUT_CHARS
+    )
+
     if paste_input.strip() and (tfidf and model):
         paste_input = paste_input[:MAX_INPUT_CHARS]
+        # Split by newlines, remove empty lines
         lines = [ln.strip() for ln in paste_input.strip().splitlines() if ln.strip()]
         if lines:
-            preds = predict_batch(lines, tfidf, model)
+            preds = predict_batch(lines, tfidf, model)  # Get prediction for each line
             st.session_state.pred_total += len(lines)
             st.session_state.pred_flagged += int(sum(preds))
-            paste_df = pd.DataFrame({"Text": lines, "Prediction": ["Non-bullying" if p == 0 else "Bullying" for p in preds]})
+            # Build a small table: Text | Prediction
+            paste_df = pd.DataFrame({
+                "Text": lines,
+                "Prediction": ["Non-bullying" if p == 0 else "Bullying" for p in preds]
+            })
             with st.expander("View results", expanded=True):
                 st.dataframe(paste_df, width='stretch')
             flagged = sum(1 for p in preds if p == 1)
@@ -163,11 +253,15 @@ with tab1:
         st.warning("Model not loaded. Train in **Train model** tab first.")
 
     st.divider()
+
+    # ----- Sub-tab 1c: Batch CSV upload -----
     st.subheader("Batch upload (CSV)")
     csv_file = st.file_uploader("Upload CSV with 'text' or 'Text' column", type="csv")
+
     if csv_file:
         try:
             up = pd.read_csv(csv_file)
+            # CSV can have "text" or "Text" column (case varies)
             col = "text" if "text" in up.columns else "Text"
             if col not in up.columns:
                 st.error("CSV must have 'text' or 'Text' column")
@@ -180,6 +274,7 @@ with tab1:
                 if not (tfidf and model):
                     st.warning("Model not loaded. Train in **Train model** tab first.")
                 else:
+                    # Process in chunks of 500 to show progress bar
                     progress = st.progress(0)
                     chunk = 500
                     preds = []
@@ -190,37 +285,61 @@ with tab1:
                     progress.empty()
                     st.session_state.pred_total += len(preds)
                     st.session_state.pred_flagged += int(sum(preds))
+                    # Add prediction columns to the uploaded dataframe
                     up = up.iloc[:len(preds)].copy()
                     up["predicted_label"] = preds
                     up["prediction"] = up["predicted_label"].map({0: "Non-bullying", 1: "Bullying"})
                     with st.expander("View results", expanded=True):
                         st.dataframe(up, width='stretch')
-                    st.download_button("Download results (CSV)", up.to_csv(index=False).encode("utf-8"),
-                                       "trollguard_predictions.csv", "text/csv")
+                    # Let user download results as CSV
+                    st.download_button(
+                        "Download results (CSV)",
+                        up.to_csv(index=False).encode("utf-8"),
+                        "trollguard_predictions.csv",
+                        "text/csv"
+                    )
         except Exception as e:
             st.error(f"Error: {e}")
 
+
 # -----------------------------------------------------------------------------
-# TAB 2: CHAT ANALYSIS (upload or paste; WhatsApp/Telegram/Discord)
+# TAB 2: CHAT ANALYSIS - Upload or paste chat exports
 # -----------------------------------------------------------------------------
+
 with tab2:
     st.subheader("Chat export analysis")
-    format_hint = st.selectbox("Chat format", ["auto", "whatsapp", "telegram", "discord"], format_func=lambda x: {"auto": "Auto-detect", "whatsapp": "WhatsApp", "telegram": "Telegram", "discord": "Discord"}[x])
+    # User selects format: Auto-detect or specific app
+    format_hint = st.selectbox(
+        "Chat format",
+        ["auto", "whatsapp", "telegram", "discord"],
+        format_func=lambda x: {
+            "auto": "Auto-detect",
+            "whatsapp": "WhatsApp",
+            "telegram": "Telegram",
+            "discord": "Discord"
+        }[x]
+    )
 
     chat_df = pd.DataFrame(columns=["timestamp", "sender", "message_text"])
 
     mode = st.radio("Choose input", ["Upload file", "Paste chat text"], horizontal=True)
+
     if mode == "Upload file":
         chat_upload = st.file_uploader("Upload chat .txt", type=["txt"])
         if chat_upload:
             content = chat_upload.read().decode("utf-8", errors="ignore")[:MAX_INPUT_CHARS]
             chat_df = parse_chat_from_string(content, format_hint)
     else:
-        pasted = st.text_area("Paste your chat export below", placeholder="09/03/2025, 14:30 - Alice: Hello...\n09/03/2025, 14:31 - Bob: Hi there", max_chars=MAX_INPUT_CHARS, key="chat_paste")
+        pasted = st.text_area(
+            "Paste your chat export below",
+            placeholder="09/03/2025, 14:30 - Alice: Hello...\n09/03/2025, 14:31 - Bob: Hi there",
+            max_chars=MAX_INPUT_CHARS,
+            key="chat_paste"
+        )
         if st.button("Analyze chat", key="chat_analyze_btn") and pasted.strip():
             try:
                 chat_df = parse_chat_from_string(pasted[:MAX_INPUT_CHARS], format_hint)
-                st.session_state["chat_analysis_result"] = chat_df  # Persist for reruns
+                st.session_state["chat_analysis_result"] = chat_df  # Save for reruns
             except Exception as e:
                 st.error(f"Error parsing chat: {e}")
         if "chat_analysis_result" in st.session_state and mode == "Paste chat text":
@@ -236,7 +355,7 @@ with tab2:
     else:
         try:
             chat_df = chat_df.copy()
-            # Optional date range filter
+            # Optional: Filter by date range
             if not chat_df.empty:
                 date_col = pd.to_datetime(chat_df["timestamp"], errors="coerce")
                 valid_dates = date_col.dropna()
@@ -249,6 +368,7 @@ with tab2:
                     if start_d is not None and end_d is not None:
                         mask = (date_col.dt.date >= start_d) & (date_col.dt.date <= end_d)
                         chat_df = chat_df.loc[mask]
+            # Clean each message and predict
             chat_df["clean_text"] = chat_df["message_text"].apply(clean_text)
             preds = predict_batch(chat_df["clean_text"].tolist(), tfidf, model)
             chat_df["bullying_label"] = preds
@@ -257,20 +377,30 @@ with tab2:
             st.session_state.pred_flagged += int(sum(preds))
             with st.expander("Message-level results", expanded=True):
                 st.dataframe(chat_df[["timestamp", "sender", "message_text", "result"]], width='stretch')
+            # Per-sender summary: total messages, how many flagged, percentage
             summary = chat_df.groupby("sender")["bullying_label"].agg(["count", "sum"]).reset_index()
             summary.columns = ["Sender", "Total messages", "Flagged"]
             total = summary["Total messages"]
-            summary["Flagged %"] = (summary["Flagged"] / total.clip(lower=1) * 100).round(1)  # clip avoids div by zero
+            # clip(lower=1) avoids division by zero if someone has 0 messages
+            summary["Flagged %"] = (summary["Flagged"] / total.clip(lower=1) * 100).round(1)
             st.subheader("Per-sender summary")
             st.dataframe(summary, width='stretch')
             export_df = chat_df[["timestamp", "sender", "message_text", "result"]]
-            st.download_button("Export chat analysis (CSV)", export_df.to_csv(index=False).encode("utf-8"), "trollguard_chat_analysis.csv", "text/csv", key="chat_export")
+            st.download_button(
+                "Export chat analysis (CSV)",
+                export_df.to_csv(index=False).encode("utf-8"),
+                "trollguard_chat_analysis.csv",
+                "text/csv",
+                key="chat_export"
+            )
         except Exception as e:
             st.error(f"Error during analysis: {str(e)}")
 
+
 # -----------------------------------------------------------------------------
-# TAB 3: TRAIN MODEL
+# TAB 3: TRAIN MODEL - Train a new model from datasets
 # -----------------------------------------------------------------------------
+
 with tab3:
     st.subheader("Train model")
     df = load_parsed_datasets()
@@ -282,21 +412,26 @@ with tab3:
         st.metric("Bullying (1)", int((df["label"] == 1).sum()))
         st.metric("Non-bullying (0)", int((df["label"] == 0).sum()))
         st.dataframe(df["label"].value_counts().rename("count"), width='stretch')
+
+    # Prepare features (X) and labels (y)
     df["clean_text"] = df["text"].apply(clean_text)
     X = df["clean_text"].values
     y = df["label"].values
     n_classes = len(np.unique(y))
-    use_stratify = n_classes >= 2 and len(y) >= 10
+    use_stratify = n_classes >= 2 and len(y) >= 10  # Stratify keeps class balance in train/test
+
     if len(X) >= 2:
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42,
             stratify=y if use_stratify else None,
         )
+
     if st.button("Train TF-IDF + Logistic Regression"):
         if len(X) < 2:
             st.error("Need at least 2 samples to train.")
         else:
             with st.spinner("Training..."):
+                # min_df: ignore words that appear in fewer than this many documents
                 min_df = 1 if len(df) < 20 else 2
                 vectoriser = TfidfVectorizer(ngram_range=(1, 2), min_df=min_df, max_df=0.95)
                 X_train_vec = vectoriser.fit_transform(X_train)
@@ -328,25 +463,28 @@ with tab3:
                         st.write("**Non-bullying (safe)**")
                         for w, c in safe_words:
                             st.caption(f"  {w} ({c:.3f})")
+                # Save model to disk
                 ad = get_artefact_dir()
                 joblib.dump(vectoriser, os.path.join(ad, "tfidf.joblib"))
                 joblib.dump(mdl, os.path.join(ad, "logreg_model.joblib"))
-                _load_model.clear()
+                _load_model.clear()  # Clear cache so next load uses new model
                 st.info("Model saved. The app will reload with the new model.")
                 st.rerun()
 
+
 # -----------------------------------------------------------------------------
-# TAB 4: ABOUT
+# TAB 4: ABOUT - Project description
 # -----------------------------------------------------------------------------
+
 with tab4:
     st.subheader("About TrollGuard")
     st.write("""
     TrollGuard is a text-based cyberbullying detection system using TF-IDF features and Logistic Regression.
-    
+
     - **Predict**: Enter single text, paste multiple lines for bulk analysis, or upload a CSV with a text column.
     - **Chat analysis**: Upload or paste WhatsApp-style chat exports (no preloaded sample).
     - **Train**: Train the model on your dataset (`*_parsed_dataset.csv` files).
-    
+
     Dataset format: CSV with columns `Text` and `oh_label` (0 = non-bullying, 1 = bullying).
     """)
     st.caption("B.Sc. Computer Science Final Year Project")
