@@ -1,9 +1,9 @@
 """
 TrollGuard – Data Loader Utility
 
-Loads *_parsed_dataset.csv files from dataset/datasets folder.
-Expects columns: Text, oh_label.
-Returns a combined DataFrame with [text, label] (binary 0/1).
+Loads all *_parsed_dataset.csv files from dataset/ or datasets/.
+Expects columns: Text, oh_label (0=non-bullying, 1=bullying).
+Returns a combined DataFrame with [text, label].
 """
 
 import os
@@ -12,18 +12,21 @@ import pandas as pd
 
 
 def get_project_root() -> str:
-    """Detect project root (works locally and in Colab)."""
-    # Try Colab / Google Drive paths first
+    """
+    Detect project root directory (folder containing dataset/, models/).
+    Handles Colab, Streamlit Cloud, and local runs.
+    """
     if os.path.exists("/content/drive/MyDrive/TrollGuard_Project"):
         return "/content/drive/MyDrive/TrollGuard_Project"
     if os.path.exists("/content/drive/MyDrive/TrollGuard_Project_Gloryia_2025"):
         return "/content/drive/MyDrive/TrollGuard_Project_Gloryia_2025"
-    # Local path: use directory of this file
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Standard: code/core/data_loader.py -> root = code/
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return root
 
 
 def get_datasets_dir() -> str:
-    """Return datasets directory (datasets or dataset)."""
+    """Return path to datasets directory. Prefers 'datasets', then 'dataset'."""
     root = get_project_root()
     for name in ("datasets", "dataset"):
         path = os.path.join(root, name)
@@ -34,10 +37,10 @@ def get_datasets_dir() -> str:
 
 def load_parsed_datasets(datasets_dir: str = None) -> pd.DataFrame:
     """
-    Load all *_parsed_dataset.csv files into a single DataFrame.
-
-    Returns:
-        DataFrame with columns [text, label] (label: 0 = non-bullying, 1 = bullying).
+    Load all *_parsed_dataset.csv files and merge into one DataFrame.
+    Expects columns: Text, oh_label.
+    Normalises labels to binary 0/1.
+    Returns DataFrame with [text, label].
     """
     if datasets_dir is None:
         datasets_dir = get_datasets_dir()
@@ -70,19 +73,19 @@ def load_parsed_datasets(datasets_dir: str = None) -> pd.DataFrame:
     try:
         df["label"] = pd.to_numeric(df["label"])
     except Exception:
+        # Handle string labels
         NON_BULLY = {
             "none", "normal", "non-toxic", "non_toxic",
             "non-aggressive", "not_cyberbullying", "safe", "neutral"
         }
-
         def to_binary(x):
             s = str(x).strip().lower()
             if s in NON_BULLY or s == "0":
                 return 0
             return 1
-
         df["label"] = df["label"].apply(to_binary)
 
+    # Ensure labels are strictly 0 or 1
     if df["label"].dtype.kind in "iu":
         uniq = set(df["label"].unique())
         if not (uniq <= {0, 1}):
@@ -93,7 +96,7 @@ def load_parsed_datasets(datasets_dir: str = None) -> pd.DataFrame:
 
 
 def get_sample_fallback() -> pd.DataFrame:
-    """Return a minimal sample dataset when no CSV files exist (fallback)."""
+    """Return minimal sample dataset when no CSV files exist."""
     return pd.DataFrame({
         "text": [
             "You are so stupid and useless",
@@ -107,7 +110,11 @@ def get_sample_fallback() -> pd.DataFrame:
 
 
 def load_chat_file(chat_path: str = None) -> pd.DataFrame:
-    """Load and parse WhatsApp-style chat export. Returns empty DataFrame if not found."""
+    """
+    Load and parse WhatsApp-style chat from file.
+    If chat_path is None, looks for dataset/sample_chat.txt.
+    Returns empty DataFrame if not found.
+    """
     from .chat_parser import parse_whatsapp_chat
 
     if chat_path is None:

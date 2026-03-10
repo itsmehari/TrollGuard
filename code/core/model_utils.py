@@ -60,7 +60,10 @@ def load_model_and_vectoriser():
         mdl_path = os.path.join(root, folder, "logreg_model.joblib")
         if os.path.exists(tf_path) and os.path.exists(mdl_path):
             try:
-                return joblib.load(tf_path), joblib.load(mdl_path)
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")  # suppress sklearn version mismatch
+                    return joblib.load(tf_path), joblib.load(mdl_path)
             except Exception:
                 pass
     return None, None

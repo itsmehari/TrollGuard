@@ -285,45 +285,55 @@ with tab3:
     df["clean_text"] = df["text"].apply(clean_text)
     X = df["clean_text"].values
     y = df["label"].values
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    n_classes = len(np.unique(y))
+    use_stratify = n_classes >= 2 and len(y) >= 10
+    if len(X) >= 2:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42,
+            stratify=y if use_stratify else None,
+        )
     if st.button("Train TF-IDF + Logistic Regression"):
-        with st.spinner("Training..."):
-            vectoriser = TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_df=0.95)
-            X_train_vec = vectoriser.fit_transform(X_train)
-            X_test_vec = vectoriser.transform(X_test)
-            mdl = LogisticRegression(max_iter=300)
-            mdl.fit(X_train_vec, y_train)
-            y_pred = mdl.predict(X_test_vec)
-            acc = accuracy_score(y_test, y_pred)
-            report_str = classification_report(y_test, y_pred)
-            cm = confusion_matrix(y_test, y_pred)
-            st.success(f"Accuracy: {acc:.2%}")
-            st.text(report_str)
-            st.write("Confusion matrix:")
-            cm_df = pd.DataFrame(cm, index=["Actual 0", "Actual 1"], columns=["Pred 0", "Pred 1"])
-            st.dataframe(cm_df, width='stretch')
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.download_button("Download report", report_str.encode("utf-8"), "classification_report.txt", "text/plain", key="dl_report")
-            with col_b:
-                st.download_button("Download confusion matrix (CSV)", cm_df.to_csv().encode("utf-8"), "confusion_matrix.csv", "text/csv", key="dl_cm")
-            bull_words, safe_words = get_top_words(vectoriser, mdl, 15)
-            with st.expander("Feature importance (top words)"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.write("**Bullying-indicative**")
-                    for w, c in bull_words:
-                        st.caption(f"  {w} ({c:.3f})")
-                with c2:
-                    st.write("**Non-bullying (safe)**")
-                    for w, c in safe_words:
-                        st.caption(f"  {w} ({c:.3f})")
-            ad = get_artefact_dir()
-            joblib.dump(vectoriser, os.path.join(ad, "tfidf.joblib"))
-            joblib.dump(mdl, os.path.join(ad, "logreg_model.joblib"))
-            st.info("Model saved. Refresh the page to use it.")
+        if len(X) < 2:
+            st.error("Need at least 2 samples to train.")
+        else:
+            with st.spinner("Training..."):
+                min_df = 1 if len(df) < 20 else 2
+                vectoriser = TfidfVectorizer(ngram_range=(1, 2), min_df=min_df, max_df=0.95)
+                X_train_vec = vectoriser.fit_transform(X_train)
+                X_test_vec = vectoriser.transform(X_test)
+                mdl = LogisticRegression(max_iter=300)
+                mdl.fit(X_train_vec, y_train)
+                y_pred = mdl.predict(X_test_vec)
+                acc = accuracy_score(y_test, y_pred)
+                report_str = classification_report(y_test, y_pred)
+                cm = confusion_matrix(y_test, y_pred)
+                st.success(f"Accuracy: {acc:.2%}")
+                st.text(report_str)
+                st.write("Confusion matrix:")
+                cm_df = pd.DataFrame(cm, index=["Actual 0", "Actual 1"], columns=["Pred 0", "Pred 1"])
+                st.dataframe(cm_df, width='stretch')
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.download_button("Download report", report_str.encode("utf-8"), "classification_report.txt", "text/plain", key="dl_report")
+                with col_b:
+                    st.download_button("Download confusion matrix (CSV)", cm_df.to_csv().encode("utf-8"), "confusion_matrix.csv", "text/csv", key="dl_cm")
+                bull_words, safe_words = get_top_words(vectoriser, mdl, 15)
+                with st.expander("Feature importance (top words)"):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.write("**Bullying-indicative**")
+                        for w, c in bull_words:
+                            st.caption(f"  {w} ({c:.3f})")
+                    with c2:
+                        st.write("**Non-bullying (safe)**")
+                        for w, c in safe_words:
+                            st.caption(f"  {w} ({c:.3f})")
+                ad = get_artefact_dir()
+                joblib.dump(vectoriser, os.path.join(ad, "tfidf.joblib"))
+                joblib.dump(mdl, os.path.join(ad, "logreg_model.joblib"))
+                _load_model.clear()
+                st.info("Model saved. The app will reload with the new model.")
+                st.rerun()
 
 # -----------------------------------------------------------------------------
 # TAB 4: ABOUT
