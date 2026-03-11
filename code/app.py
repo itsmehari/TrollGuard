@@ -89,7 +89,7 @@ import joblib  # Saves and loads Python objects (our model) to/from disk
 
 MAX_INPUT_CHARS = 50_000   # Max characters per text box or paste (50 thousand)
 BATCH_CSV_LIMIT = 5_000    # Max rows for batch CSV (Streamlit Cloud memory limit)
-MAX_TRAIN_SAMPLES = 15_000  # Max dataset rows for training (Streamlit Cloud memory limit)
+MAX_TRAIN_SAMPLES = 5_000   # Max dataset rows (Streamlit Cloud ~1GB limit)
 
 
 # =============================================================================

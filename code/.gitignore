@@ -28,8 +28,8 @@ outputs/
 # Pre-trained model – not committed to avoid TF-IDF/model mismatch on Streamlit Cloud (train in-app instead)
 models/*.joblib
 
-# Data (large files - uncomment if needed)
-# dataset/*.csv
+# Data – exclude from repo to stay within Streamlit Cloud memory (use sample fallback)
+dataset/*.csv
 
 # OS
 .DS_Store
