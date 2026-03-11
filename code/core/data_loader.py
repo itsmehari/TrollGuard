@@ -69,9 +69,10 @@ def get_datasets_dir() -> str:
     return os.path.join(root, "dataset")
 
 
-def load_parsed_datasets(datasets_dir: str = None) -> pd.DataFrame:
+def load_parsed_datasets(datasets_dir: str = None, max_rows: int = None) -> pd.DataFrame:
     """
     Load all *_parsed_dataset.csv files, merge them into one table, and normalise labels.
+    max_rows: If set, limit to this many rows (for Streamlit Cloud memory limits).
 
     HOW IT WORKS (step by step):
     1. Find all CSV files matching *_parsed_dataset.csv (e.g. twitter_parsed_dataset.csv)
@@ -95,19 +96,18 @@ def load_parsed_datasets(datasets_dir: str = None) -> pd.DataFrame:
         return pd.DataFrame(columns=["text", "label"])
 
     dfs = []
+    n_files = len(csv_files)
+    rows_per_file = (max_rows // n_files) if max_rows and n_files else None
     for path in csv_files:
         try:
-            tmp = pd.read_csv(path)
-            # Only use files that have the required columns
+            tmp = pd.read_csv(path, nrows=rows_per_file)  # Limit rows per file when max_rows set
             if "Text" not in tmp.columns or "oh_label" not in tmp.columns:
                 continue
-            # Keep only Text and oh_label, rename to lowercase for consistency
             tmp = tmp[["Text", "oh_label"]].rename(
                 columns={"Text": "text", "oh_label": "label"}
             )
             dfs.append(tmp)
         except Exception:
-            # If a file is corrupted or malformed, skip it
             continue
 
     if not dfs:
@@ -146,6 +146,8 @@ def load_parsed_datasets(datasets_dir: str = None) -> pd.DataFrame:
             df["label"] = df["label"].apply(lambda v: 0 if v == 0 else 1)
 
     df = df[["text", "label"]].dropna()
+    if max_rows is not None and len(df) > max_rows:
+        df = df.sample(max_rows, random_state=42)  # Random sample to keep class balance
     return df
 
 

@@ -88,7 +88,8 @@ import joblib  # Saves and loads Python objects (our model) to/from disk
 # upload a CSV with 1 million rows and freeze the server. These limits protect us.
 
 MAX_INPUT_CHARS = 50_000   # Max characters per text box or paste (50 thousand)
-BATCH_CSV_LIMIT = 10_000   # Max rows to process in a batch CSV (10 thousand)
+BATCH_CSV_LIMIT = 5_000    # Max rows for batch CSV (Streamlit Cloud memory limit)
+MAX_TRAIN_SAMPLES = 15_000  # Max dataset rows for training (Streamlit Cloud memory limit)
 
 
 # =============================================================================
@@ -114,6 +115,15 @@ def _load_model():
     Cached so we only load once per session.
     """
     return load_model_and_vectoriser()
+
+
+@st.cache_data(ttl=300)  # Cache 5 min to avoid reloading on every rerun
+def _load_data_capped():
+    """Load datasets capped at MAX_TRAIN_SAMPLES to stay within Streamlit Cloud memory."""
+    df = load_parsed_datasets(max_rows=MAX_TRAIN_SAMPLES)
+    if df.empty:
+        return get_sample_fallback()
+    return df
 
 
 # =============================================================================
@@ -170,14 +180,11 @@ with st.sidebar:
             st.caption("Bullying: " + ", ".join(w for w, _ in bull[:5]))
             st.caption("Safe: " + ", ".join(w for w, _ in safe[:5]))
 
-    # Dataset info - where data is and how many samples
+    # Dataset info - where data is and how many samples (cached, capped for memory)
     st.header("Datasets")
     ds_dir = get_datasets_dir()
     st.text(f"Data: {ds_dir}")
-    df_raw = load_parsed_datasets()
-    if df_raw.empty:
-        df_raw = get_sample_fallback()
-        st.info("Using sample fallback data")  # Blue info message
+    df_raw = _load_data_capped()
     st.metric("Samples", len(df_raw))
 
 
@@ -403,11 +410,12 @@ with tab2:
 
 with tab3:
     st.subheader("Train model")
-    df = load_parsed_datasets()
+    df = _load_data_capped()
     if df.empty:
         df = get_sample_fallback()
         st.info("Using sample fallback data (no CSVs found)")
     with st.expander("Dataset stats"):
+        st.caption(f"(Capped at {MAX_TRAIN_SAMPLES:,} for memory)")
         st.metric("Total samples", len(df))
         st.metric("Bullying (1)", int((df["label"] == 1).sum()))
         st.metric("Non-bullying (0)", int((df["label"] == 0).sum()))
