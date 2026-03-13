@@ -191,7 +191,11 @@ def get_top_words(tfidf, model, top_n: int = 15) -> tuple:
     """
     if tfidf is None or model is None:
         return [], []
-    vocab = np.asarray(tfidf.get_feature_names_out())
+    # get_feature_names_out (sklearn>=1.0); fallback for older sklearn
+    fn = getattr(tfidf, "get_feature_names_out", None) or getattr(tfidf, "get_feature_names", None)
+    if fn is None:
+        return [], []
+    vocab = np.asarray(fn())
     coef = None
     if hasattr(model, "coef_"):
         coef = np.asarray(model.coef_[0])

@@ -174,12 +174,14 @@ with st.sidebar:
     st.metric("Flagged", st.session_state.pred_flagged)
 
     # Feature importance: Which words does the model associate with bullying vs safe?
-    # This helps explain why the model made its decision (interpretability).
     if tfidf and model:
-        with st.expander("Feature importance"):  # Collapsible section
-            bull, safe = get_top_words(tfidf, model, 8)
-            st.caption("Bullying: " + ", ".join(w for w, _ in bull[:5]))
-            st.caption("Safe: " + ", ".join(w for w, _ in safe[:5]))
+        with st.expander("Feature importance"):
+            try:
+                bull, safe = get_top_words(tfidf, model, 8)
+                st.caption("Bullying: " + ", ".join(w for w, _ in bull[:5]) if bull else "—")
+                st.caption("Safe: " + ", ".join(w for w, _ in safe[:5]) if safe else "—")
+            except Exception as e:
+                st.caption(f"Feature importance unavailable: {e}")
 
     # Dataset info - where data is and how many samples (cached, capped for memory)
     st.header("Datasets")
@@ -468,17 +470,21 @@ with tab3:
                     st.download_button("Download report", report_str.encode("utf-8"), "classification_report.txt", "text/plain", key="dl_report")
                 with col_b:
                     st.download_button("Download confusion matrix (CSV)", cm_df.to_csv().encode("utf-8"), "confusion_matrix.csv", "text/csv", key="dl_cm")
-                bull_words, safe_words = get_top_words(vectoriser, mdl, 15)
-                with st.expander("Feature importance (top words)"):
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        st.write("**Bullying-indicative**")
-                        for w, c in bull_words:
-                            st.caption(f"  {w} ({c:.3f})")
-                    with c2:
-                        st.write("**Non-bullying (safe)**")
-                        for w, c in safe_words:
-                            st.caption(f"  {w} ({c:.3f})")
+                try:
+                    bull_words, safe_words = get_top_words(vectoriser, mdl, 15)
+                    with st.expander("Feature importance (top words)"):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.write("**Bullying-indicative**")
+                            for w, c in bull_words:
+                                st.caption(f"  {w} ({c:.3f})")
+                        with c2:
+                            st.write("**Non-bullying (safe)**")
+                            for w, c in safe_words:
+                                st.caption(f"  {w} ({c:.3f})")
+                except Exception as e:
+                    with st.expander("Feature importance (top words)"):
+                        st.caption(f"Not available for this model: {e}")
                 # Save model to disk (classifier.joblib for all models)
                 ad = get_artefact_dir()
                 joblib.dump(vectoriser, os.path.join(ad, "tfidf.joblib"))
