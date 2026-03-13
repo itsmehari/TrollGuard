@@ -28,10 +28,21 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import SGDClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 from .data_loader import get_project_root
+
+# Model registry: id -> (display_name, model_class, **kwargs)
+MODEL_REGISTRY = {
+    "logreg": ("Logistic Regression", LogisticRegression, {"max_iter": 300}),
+    "nb": ("Naive Bayes", MultinomialNB, {}),
+    "svm": ("SVM (Linear)", SGDClassifier, {"loss": "hinge", "max_iter": 1000, "random_state": 42}),
+    "rf": ("Random Forest", RandomForestClassifier, {"n_estimators": 100, "random_state": 42}),
+}
 
 
 def clean_text(text: str) -> str:
@@ -80,31 +91,32 @@ def get_artefact_dir() -> str:
     return path
 
 
+def create_model(model_id: str):
+    """
+    Create an untrained classifier from model_id.
+    Returns sklearn-compatible classifier (has .fit, .predict).
+    """
+    if model_id not in MODEL_REGISTRY:
+        model_id = "logreg"
+    _, model_class, kwargs = MODEL_REGISTRY[model_id]
+    return model_class(**kwargs)
+
+
 def load_model_and_vectoriser():
     """
-    Load the trained TF-IDF vectoriser and Logistic Regression model from disk.
-
-    WHAT WE LOAD:
-    - tfidf.joblib: Converts text into numbers (the model understands numbers, not words)
-    - logreg_model.joblib: The actual classifier (bullying or not)
-
-    WHERE WE LOOK:
-    - First: models/ folder
-    - Then: outputs/ folder (some setups use this name)
-
-    WHY SUPPRESS WARNINGS:
-    scikit-learn sometimes warns about version mismatch when loading old models.
-    The model usually still works; we suppress the warning to avoid scaring the user.
-
+    Load the trained TF-IDF vectoriser and classifier from disk.
+    Supports new format (classifier.joblib) and legacy (logreg_model.joblib).
     Returns: (tfidf, model) if found, (None, None) if not found or load fails
     """
+    import warnings
     root = get_project_root()
     for folder in ("models", "outputs"):
         tf_path = os.path.join(root, folder, "tfidf.joblib")
-        mdl_path = os.path.join(root, folder, "logreg_model.joblib")
+        mdl_path = os.path.join(root, folder, "classifier.joblib")
+        if not os.path.exists(mdl_path):
+            mdl_path = os.path.join(root, folder, "logreg_model.joblib")
         if os.path.exists(tf_path) and os.path.exists(mdl_path):
             try:
-                import warnings
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")  # Hide sklearn version mismatch warnings
                     tfidf = joblib.load(tf_path)
@@ -169,36 +181,36 @@ def predict_batch(texts: list, tfidf, model) -> np.ndarray:
 
 def get_top_words(tfidf, model, top_n: int = 15) -> tuple:
     """
-    Find which words the model thinks indicate bullying vs safe messages.
+    Find which words the model associates with bullying vs safe messages.
 
-    HOW IT WORKS:
-    Logistic Regression learns a coefficient (weight) for each word:
-    - High positive coefficient = word tends to appear in bullying messages
-    - Low (or negative) coefficient = word tends to appear in safe messages
-
-    We sort words by coefficient and return the top N from each end.
-
-    WHY THE LENGTH GUARD:
-    Sometimes the vocabulary (word list) and coefficients have different lengths
-    due to scikit-learn version differences when saving/loading. We take the
-    minimum length to avoid IndexError (crash).
+    Supports: Logistic Regression, SVM (coef_), Naive Bayes (feature_log_prob_),
+    Random Forest (feature_importances_).
 
     Returns: (bullying_words, safe_words)
-             Each is a list of (word, coefficient) tuples
-             bullying_words = words that push prediction toward 1
-             safe_words = words that push prediction toward 0
+             Each is a list of (word, score) tuples
     """
-    if tfidf is None or model is None or not hasattr(model, "coef_"):
+    if tfidf is None or model is None:
         return [], []
-    vocab = np.asarray(tfidf.get_feature_names_out())  # All words the model knows
-    coef = np.asarray(model.coef_[0])                   # One coefficient per word
-    # Guard: vocab and coef must have same length (version mismatch can break this)
+    vocab = np.asarray(tfidf.get_feature_names_out())
+    coef = None
+    if hasattr(model, "coef_"):
+        coef = np.asarray(model.coef_[0])
+    elif hasattr(model, "feature_log_prob_"):
+        # NB: log P(word|bullying) - log P(word|safe) as "coefficient"
+        lp = model.feature_log_prob_
+        if lp.shape[0] >= 2:
+            coef = lp[1] - lp[0]
+        else:
+            coef = lp[0]
+    elif hasattr(model, "feature_importances_"):
+        coef = np.asarray(model.feature_importances_)
+    if coef is None:
+        return [], []
     n = min(len(vocab), len(coef))
     if n == 0:
         return [], []
     vocab, coef = vocab[:n], coef[:n]
-    idx_sorted = np.argsort(coef)  # Index order from lowest to highest coefficient
-    # Lowest coefficients = safe words; highest = bullying words
+    idx_sorted = np.argsort(coef)
     non_bullying = [(str(vocab[i]), float(coef[i])) for i in idx_sorted[:top_n]]
     bullying = [(str(vocab[i]), float(coef[i])) for i in idx_sorted[-top_n:][::-1]]
     return bullying, non_bullying

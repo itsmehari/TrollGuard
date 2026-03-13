@@ -61,17 +61,18 @@ from core.data_loader import (
 )
 from core.chat_parser import parse_chat_from_string  # Parses WhatsApp/Telegram/Discord chat text
 from core.model_utils import (
-    clean_text,              # Removes URLs, @mentions, etc. from text
-    load_model_and_vectoriser,  # Loads the trained model from disk
-    predict_text,            # Predict bullying (0 or 1) for one message
-    predict_batch,           # Predict for many messages at once
-    get_artefact_dir,        # Path to models/ folder (where we save the model)
-    get_top_words,           # Which words the model thinks indicate bullying vs safe
+    clean_text,
+    load_model_and_vectoriser,
+    predict_text,
+    predict_batch,
+    get_artefact_dir,
+    get_top_words,
+    create_model,
+    MODEL_REGISTRY,
 )
 
 # Machine learning libraries:
-from sklearn.feature_extraction.text import TfidfVectorizer  # Converts text to numbers
-from sklearn.linear_model import LogisticRegression         # The classifier (bullying or not)
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split        # Splits data for training
 from sklearn.metrics import (
     accuracy_score,
@@ -434,17 +435,24 @@ with tab3:
             stratify=y if use_stratify else None,
         )
 
-    if st.button("Train TF-IDF + Logistic Regression"):
+    # Model selector: lightweight sklearn classifiers (Streamlit Cloud friendly)
+    model_choice = st.selectbox(
+        "Choose classifier",
+        options=list(MODEL_REGISTRY.keys()),
+        format_func=lambda k: MODEL_REGISTRY[k][0],
+        key="model_select",
+    )
+
+    if st.button("Train TF-IDF + Classifier"):
         if len(X) < 2:
             st.error("Need at least 2 samples to train.")
         else:
-            with st.spinner("Training..."):
-                # min_df: ignore words that appear in fewer than this many documents
+            with st.spinner(f"Training {MODEL_REGISTRY[model_choice][0]}..."):
                 min_df = 1 if len(df) < 20 else 2
                 vectoriser = TfidfVectorizer(ngram_range=(1, 2), min_df=min_df, max_df=0.95)
                 X_train_vec = vectoriser.fit_transform(X_train)
                 X_test_vec = vectoriser.transform(X_test)
-                mdl = LogisticRegression(max_iter=300)
+                mdl = create_model(model_choice)
                 mdl.fit(X_train_vec, y_train)
                 y_pred = mdl.predict(X_test_vec)
                 acc = accuracy_score(y_test, y_pred)
@@ -471,10 +479,10 @@ with tab3:
                         st.write("**Non-bullying (safe)**")
                         for w, c in safe_words:
                             st.caption(f"  {w} ({c:.3f})")
-                # Save model to disk
+                # Save model to disk (classifier.joblib for all models)
                 ad = get_artefact_dir()
                 joblib.dump(vectoriser, os.path.join(ad, "tfidf.joblib"))
-                joblib.dump(mdl, os.path.join(ad, "logreg_model.joblib"))
+                joblib.dump(mdl, os.path.join(ad, "classifier.joblib"))
                 _load_model.clear()  # Clear cache so next load uses new model
                 st.info("Model saved. The app will reload with the new model.")
                 st.rerun()
@@ -487,7 +495,9 @@ with tab3:
 with tab4:
     st.subheader("About TrollGuard")
     st.write("""
-    TrollGuard is a text-based cyberbullying detection system using TF-IDF features and Logistic Regression.
+    TrollGuard is a text-based cyberbullying detection system using TF-IDF features and multiple classifiers.
+
+    **Models**: Logistic Regression, Naive Bayes, SVM (Linear), Random Forest. Choose one when training.
 
     - **Predict**: Enter single text, paste multiple lines for bulk analysis, or upload a CSV with a text column.
     - **Chat analysis**: Upload or paste WhatsApp-style chat exports (no preloaded sample).
